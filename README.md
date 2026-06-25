@@ -1,0 +1,81 @@
+# AI Podcast Clipper
+
+Turns long-form podcasts and interviews into vertical, captioned, watermarked
+short-form clips for TikTok, YouTube Shorts, and Reels. Paste a YouTube URL (or
+upload a video), and the pipeline transcribes it, picks the best 30–60s moments
+with an LLM, tracks the active speaker, reframes to 9:16, burns in captions and
+a watermark, and delivers the clips through a web dashboard.
+
+Built on top of [Andreas Trolle's open-source ai-podcast-clipper](https://github.com/Andreaswt/ai-podcast-clipper-saas)
+(MIT). This fork adds server-side YouTube ingestion, a burned-in configurable
+watermark, hardened LLM moment-selection, and an end-to-end cloud deployment.
+
+## Architecture
+
+```
+Browser (Next.js / Vercel)
+  │  server action: validate URL → write job row → emit event
+  ▼
+Inngest Cloud (durable queue: retries, 1 job/user concurrency)
+  │  calls back into /api/inngest → POST to Modal (bearer auth)
+  ▼
+Modal (Python, L40S GPU)
+  │  yt-dlp → WhisperX transcription → Gemini moment selection
+  │  → LR-ASD speaker tracking → ffmpeg reframe + captions + watermark
+  ▼
+AWS S3  ──(signed URLs)──►  dashboard playback
+```
+
+The two halves never call each other directly — Inngest sits between them, and
+the contract is an S3 key. The database never touches video; the GPU never
+touches the database.
+
+| Layer | Service |
+|---|---|
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind, shadcn/ui, Auth.js, Prisma |
+| Queue | Inngest Cloud |
+| GPU backend | Modal (L40S) |
+| Database | Postgres (Supabase) |
+| Storage | AWS S3 (signed PUT/GET) |
+| AI | Gemini (moment selection), WhisperX (transcription), LR-ASD (speaker tracking) |
+| Payments | Stripe (test mode) |
+
+## What this fork adds
+
+- **YouTube ingestion** — the original only took file uploads. Added a URL
+  path: a dashboard tab + server action, and a server-side download step
+  (`youtube_url` handled in the Modal worker, plus a standalone
+  `ingest_youtube.py` for environments where YouTube bot-checks the GPU host).
+- **Burned-in watermark** — an ffmpeg `drawtext` pass after captions, so the
+  mark lives in the exported MP4 (not a web overlay). Text is configurable via
+  the `WATERMARK_TEXT` env var.
+- **Hardened moment selection** — JSON response schema, a retry/fallback chain
+  across Gemini models, a salvage parser for truncated responses, and a
+  duration filter so clips actually land in the 30–60s window.
+- **Resilient queue** — the Inngest function fails loudly on bad backend
+  responses and recovers jobs whose clips reached S3 after the request window
+  closed.
+- **Ops scripts** — account seeding, admin trigger, job status, and a
+  deliverables builder under `scripts/` and the backend dir.
+
+## Setup
+
+1. Copy `.env.example` to `.env` and fill in the values.
+2. **Frontend:** `cd ai-podcast-clipper-frontend && npm install && npm run db:push && npm run dev`
+3. **Backend (Modal):**
+   ```bash
+   cd ai-podcast-clipper-backend
+   python -m venv .venv && .venv/Scripts/activate   # or source .venv/bin/activate
+   pip install -r requirements.txt
+   # ASD weights are gitignored — fetch them once before deploying:
+   python -m gdown 1AbN9fCf9IexMxEKXLQY2KYBlb-IhSEea -O asd/pretrain_TalkSet.model
+   python -m gdown 1KafnHz7ccT-3IyddBsL5yi2xGtxAKypt -O asd/model/faceDetector/s3fd/sfd_face.pth
+   modal setup && modal deploy main.py
+   ```
+4. Put the Modal endpoint URL in `PROCESS_VIDEO_ENDPOINT`, set a shared bearer
+   token in both `PROCESS_VIDEO_ENDPOINT_AUTH` (frontend) and the Modal
+   secret's `AUTH_TOKEN`, and configure S3 CORS for your domain (`cors.json`).
+
+## Credits
+
+Original project © Andreas Trolle, MIT licensed. See `LICENSE.MD`.
