@@ -1,0 +1,12 @@
+# Auto-load any dashboard JSON in the dashboards folder.
+apiVersion: 1
+
+providers:
+  - name: podcast-clipper
+    orgId: 1
+    folder: "Podcast Clipper"
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

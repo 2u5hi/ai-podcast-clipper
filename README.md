@@ -49,14 +49,32 @@ touches the database.
 - **Burned-in watermark** — an ffmpeg `drawtext` pass after captions, so the
   mark lives in the exported MP4 (not a web overlay). Text is configurable via
   the `WATERMARK_TEXT` env var.
-- **Hardened moment selection** — JSON response schema, a retry/fallback chain
-  across Gemini models, a salvage parser for truncated responses, and a
-  duration filter so clips actually land in the 30–60s window.
+- **Hardened moment selection** — a generalized prompt that finds any
+  self-contained engaging moment (stories, hot takes, explanations, Q&A) rather
+  than only interview questions, a JSON response schema, a retry/fallback chain
+  across Gemini models (ordered fastest-reliable-first to avoid dead time on an
+  overloaded model), a salvage parser for truncated responses, and a duration
+  filter so clips actually land in the 30–60s window.
 - **Resilient queue** — the Inngest function fails loudly on bad backend
   responses and recovers jobs whose clips reached S3 after the request window
   closed.
 - **Ops scripts** — account seeding, admin trigger, job status, and a
   deliverables builder under `scripts/` and the backend dir.
+
+## Observability
+
+A local Grafana + Loki + Promtail stack lives under `observability/` for
+monitoring the app under test — logs flow app → `logs/frontend.log` → Promtail
+→ Loki → Grafana, with request status codes parsed into labels for graphing.
+
+```powershell
+docker compose -f observability/docker-compose.yml up -d   # start stack
+./observability/run-frontend-with-logs.ps1                 # run frontend, logs → Loki
+# Grafana (anonymous admin): http://localhost:3001
+```
+
+See [observability/README.md](observability/README.md) for the LogQL cheatsheet
+and design notes (labels vs. content, ingestion vs. event time).
 
 ## Setup
 

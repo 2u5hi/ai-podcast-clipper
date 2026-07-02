@@ -1,0 +1,38 @@
+# Promtail tails the app's log files and pushes them to Loki.
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Next.js dev server logs (piped to observability/logs/frontend.log on the host)
+  - job_name: frontend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: frontend
+          app: podcast-clipper
+          __path__: /var/log/app/frontend.log
+    pipeline_stages:
+      # Next.js request lines look like:  GET /dashboard 500 in 1863ms
+      - regex:
+          expression: '^\s*(?P<method>GET|POST|PUT|DELETE|PATCH)\s+(?P<route>\S+)\s+(?P<status>\d{3})\s+in\s+(?P<duration_ms>\d+)ms'
+      # promote http status into a label so we can filter/graph by it
+      - labels:
+          method:
+          status:
+      # tag error-level lines so we can alert/graph on them
+      - match:
+          selector: '{job="frontend"}'
+          stages:
+            - regex:
+                expression: '(?i)(?P<level>error|warn|prisma:error|unhandled)'
+            - labels:
+                level:

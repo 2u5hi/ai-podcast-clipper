@@ -1,0 +1,2 @@
+# runtime log files tailed by Promtail — not source
+logs/*.log

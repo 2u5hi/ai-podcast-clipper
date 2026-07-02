@@ -399,11 +399,15 @@ class AiPodcastClipper:
 
     def identify_moments(self, transcript: dict):
         prompt = """
-    This is a podcast video transcript consisting of word, along with each words's start and end time. I am looking to create clips between a minimum of 30 and maximum of 60 seconds long. The clip should never exceed 60 seconds.
+    This is a transcript of a spoken-word video (podcast, interview, solo commentary, vlog, panel, lecture, or similar), consisting of words along with each word's start and end time. I am looking to create clips between a minimum of 30 and maximum of 60 seconds long. The clip should never exceed 60 seconds.
 
-    Your task is to find and extract stories, or question and their corresponding answers from the transcript.
-    Each clip should begin with the question and conclude with the answer.
-    It is acceptable for the clip to include a few additional sentences before a question if it aids in contextualizing the question.
+    Your task is to find the most engaging, self-contained moments in the transcript. A good moment is any of:
+    - A complete story or anecdote.
+    - A question and its corresponding answer.
+    - A strong opinion, hot take, or piece of advice.
+    - A clear explanation of a single idea, or a surprising fact.
+    - An emotional or funny exchange.
+    Each clip must make sense on its own to a viewer who has not seen the rest of the video: it should begin where the thought begins and end where the thought resolves. It is acceptable to include a sentence or two of setup before the moment if it aids context.
 
     Please adhere to the following rules:
     - Ensure that clips do not overlap with one another.
@@ -414,7 +418,8 @@ class AiPodcastClipper:
 
     Avoid including:
     - Moments of greeting, thanking, or saying goodbye.
-    - Non-question and answer interactions.
+    - Housekeeping talk (subscribe reminders, sponsor reads, channel announcements).
+    - Fragments that depend on context the viewer will not have.
 
     If there are no valid clips to extract, the output should be an empty list [], in JSON format. Also readable by json.loads() in Python.
 
@@ -436,13 +441,11 @@ class AiPodcastClipper:
                 },
             },
         )
-        # retry the good model with a long backoff before falling back -- the big
-        # transcript prompt trips free-tier rate limits, and flash-lite picks bad moments.
-        # don't use gemini-2.0-flash, its free tier quota is 0 now
+            #readjusted to start with 2.5 flash, then 3 flash preview, then 3 flash preview again, then gemini-flash-latest, then gemini-2.5-flash-lite
         attempts = [
-            "gemini-3-flash-preview",
-            "gemini-3-flash-preview",
             "gemini-2.5-flash",
+            "gemini-3-flash-preview",
+            "gemini-3-flash-preview",
             "gemini-flash-latest",
             "gemini-2.5-flash-lite",
         ]
@@ -456,7 +459,7 @@ class AiPodcastClipper:
             except Exception as e:
                 print(f"Gemini model {model} (attempt {i + 1}) failed: {e}")
                 last_error = e
-                time.sleep(60)
+                time.sleep(15)
         raise last_error
 
     @modal.fastapi_endpoint(method="POST")
