@@ -9,10 +9,11 @@ phases get the same treatment when they start. Decisions along the way are in [`
 A self-serve SaaS that turns long-form podcasts and interviews into vertical, captioned, branded short-form
 clips. A creator uploads an episode, buys credits, and downloads clips ready for TikTok, Shorts, and Reels.
 
-The clipper is a product of a company: the company is the legal operator (terms, privacy policy, Stripe,
-invoices) and can run other products later; the product has its own descriptive name. Neither name is chosen
-yet, so both live in one config file with placeholders (Phase 1 commit 7). DailyTech stays the name of the
-social accounts.
+The clipper is a product of **Soushi Technologies** (chosen 2026-10-09): the company is the legal operator (terms,
+privacy policy, Stripe, invoices) and also does tech solutions and AI integration work, and can run other
+products later. The product gets its own descriptive name, not chosen yet. Both live in
+`src/config/brand.ts`. DailyTech stays the name of the social accounts. "Soushi AI" was ruled out: Soshi
+(soshi.io) is a funded AI social-media-marketing startup, too close in name and market.
 
 | Pillar | What it means here |
 |---|---|
@@ -52,11 +53,11 @@ Each becomes an ADR when it is made.
 
 | Decision | Why it's open |
 |---|---|
-| Company name, product name, support email, governing country | Needed by the legal pages (Phase 1 commit 8); placeholders until then. Whether to form a company before taking payments is a question for a local accountant or lawyer; without one, the terms name the founder as the operator |
+| Product name, support email, governing law | Needed by the legal pages (Phase 1 commit 8); placeholders in `src/config/brand.ts` until then. Governing law is likely Georgia, where the founder is based. The company's legal form (LLC or otherwise) is a question for a Georgia CPA or lawyer, and should be settled before Stripe is verified for live payments (commit 9), since the Stripe account belongs to that entity |
 | Keep YouTube URL ingestion for paying users? | Downloading from YouTube conflicts with its terms of service, and Modal's IPs get bot-checked. Off by default ([ADR 0012](adr/0012-youtube-off-for-customers.md)); turning it on needs terms that cover it |
 | What a credit buys, and pack prices | Today a credit is one clip. Per-minute-of-source pricing tracks GPU cost better. Needs real cost-per-job numbers first (Phase 2) ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
 
-Settled: free credits at sign-up are granted only once an email is confirmed, with sign-ups rate-limited
+Settled: the company name is Soushi Technologies. Free credits at sign-up are granted only once an email is confirmed, with sign-ups rate-limited
 ([ADR 0015](adr/0015-verified-rate-limited-accounts.md)). Custom watermarks are not sold per clip: branding is
 a reason to buy credits, not a surcharge on them. The watermark rule is per account: any purchase lets a creator
 use their own text or none on every job ([ADR 0016](adr/0016-watermark-per-account.md)).
