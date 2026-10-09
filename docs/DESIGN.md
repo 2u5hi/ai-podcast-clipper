@@ -54,6 +54,7 @@ AWS S3 ── list prefix ──► Inngest writes Clip rows, deducts credits
 | Job function | `src/inngest/functions.ts` | Inngest v4 |
 | GPU pipeline | `ai-podcast-clipper-backend/main.py`, `moments.py` | Modal, Python 3.11, CUDA 12.4, WhisperX large-v2, LR-ASD, ffmpeg, pysubs2, google-genai |
 | Admin ingestion | `ai-podcast-clipper-backend/ingest_youtube.py`, `scripts/trigger-processing.mjs` | yt-dlp locally → S3 → Inngest event |
+| Public pages | `src/app/{pricing,terms,privacy,refunds}` | No sign-in; text drawn from `brand.ts` and `pricing.ts`; site-wide footer in the root layout |
 | Brand config | `ai-podcast-clipper-frontend/src/config/brand.ts` | Company and product names, support email, governing country (placeholders until chosen), house watermark |
 | Ops scripts | `ai-podcast-clipper-frontend/scripts/` | `ensure-reviewer`, `job-status`, `cleanup-stale-jobs`, `delete-job`, `trigger-processing` |
 | Local observability | `observability/` | Grafana + Loki + Promtail, development only ([ADR 0010](adr/0010-local-observability-stack.md)) |

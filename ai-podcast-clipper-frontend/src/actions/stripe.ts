@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import Stripe from "stripe";
+import { type PackId } from "~/config/pricing";
 import { env } from "~/env";
 import { requireVerifiedUserId } from "~/server/accounts";
 import { db } from "~/server/db";
@@ -10,7 +11,7 @@ const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-04-30.basil",
 });
 
-export type PriceId = "small" | "medium" | "large";
+export type PriceId = PackId;
 
 const PRICE_IDS: Record<PriceId, string> = {
   small: env.STRIPE_SMALL_CREDIT_PACK,

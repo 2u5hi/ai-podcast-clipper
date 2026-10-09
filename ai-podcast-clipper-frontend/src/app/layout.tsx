@@ -1,4 +1,5 @@
 import { BRAND } from "~/config/brand";
+import { SiteFooter } from "~/components/site-footer";
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";
@@ -20,7 +21,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${geist.variable}`}>
-      <body>{children}</body>
+      <body className="flex min-h-svh flex-col">
+        <div className="flex-1">{children}</div>
+        <SiteFooter />
+      </body>
     </html>
   );
 }

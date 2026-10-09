@@ -20,6 +20,7 @@ import { signupSchema, type SignupFormValues } from "~/schemas/auth";
 import { signUp } from "~/actions/auth";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { AgreementNote } from "./pricing";
 
 export function SignupForm({
   className,
@@ -117,6 +118,9 @@ export function SignupForm({
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? "Signing up..." : "Sign up"}
               </Button>
+            </div>
+            <div className="mt-4">
+              <AgreementNote action="signing up" />
             </div>
             <div className="mt-4 text-center text-sm">
               Already have an account?{" "}
