@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BRAND } from "~/config/brand";
 
 // Bump when a policy's substance changes; the pages show it as "Last updated".
-export const LEGAL_LAST_UPDATED = "October 9, 2026";
+export const LEGAL_LAST_UPDATED = "October 10, 2026";
 
 // how long after purchase an unused credit pack can be refunded on request
 export const REFUND_WINDOW_DAYS = 14;

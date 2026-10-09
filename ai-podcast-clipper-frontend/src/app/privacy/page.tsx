@@ -19,7 +19,7 @@ const PROVIDERS = [
   ["Modal", "runs the video processing: transcription, reframing, captions"],
   [
     "Google (Gemini API)",
-    "receives the transcript text to choose clip-worthy moments; we use Google’s paid API tier, under which Google doesn’t use it to train its models",
+    "receives the transcript text to choose clip-worthy moments. We use both Google’s paid and free API tiers. On the paid tier, Google doesn’t use your transcript to improve its products. On the free tier, Google may use it to improve its products and machine-learning models, and people at Google may review it. Your video itself is never sent to Google",
   ],
   ["Inngest", "queues processing jobs; it sees job and account IDs only"],
   [
@@ -74,7 +74,9 @@ export default function PrivacyPage() {
       </ul>
       <p>
         We don’t sell your personal information or share it for advertising, and
-        we don’t use your videos to train AI models.
+        we don’t use your videos to train AI models. How Google may use
+        transcripts depends on its API tier; see “Who processes it for us”
+        below.
       </p>
 
       <h2>Who processes it for us</h2>
