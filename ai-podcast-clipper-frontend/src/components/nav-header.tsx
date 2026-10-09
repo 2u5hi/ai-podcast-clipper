@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND } from "~/config/brand";
 import Link from "next/link";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -21,10 +22,15 @@ const NavHeader = ({ credits, email }: { credits: number; email: string }) => {
     <header className="bg-background sticky top-0 z-10 flex justify-center border-b">
       <div className="container flex h-16 items-center justify-between px-4 py-2">
         <Link href="/dashboard" className="flex items-center">
-          <div className="font-sans text-xl font-medium tracking-tight">
-            <span className="text-foreground">podcast</span>
+          <div
+            className="font-sans text-xl font-medium tracking-tight"
+            aria-label={BRAND.productName}
+          >
+            <span className="text-foreground">{BRAND.wordmark[0]}</span>
             <span className="font-light text-gray-500">/</span>
-            <span className="text-foreground font-light">clipper</span>
+            <span className="text-foreground font-light">
+              {BRAND.wordmark[1]}
+            </span>
           </div>
         </Link>
 

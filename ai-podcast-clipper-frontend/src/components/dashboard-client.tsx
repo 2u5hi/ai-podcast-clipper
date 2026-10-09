@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND } from "~/config/brand";
 import Dropzone, { type DropzoneState } from "shadcn-dropzone";
 import type { Clip, JobStatus } from "@prisma/client";
 import Link from "next/link";
@@ -163,7 +164,7 @@ export function DashboardClient({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Podcast Clipper
+            {BRAND.productName}
           </h1>
           <p className="text-muted-foreground">
             Upload your podcast and get AI-generated clips instantly

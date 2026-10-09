@@ -1,3 +1,4 @@
+import { BRAND } from "~/config/brand";
 import { env } from "~/env";
 import { hashPassword } from "~/lib/auth";
 import { auth } from "~/server/auth";
@@ -16,7 +17,7 @@ export async function sendVerificationEmail(user: {
   const token = await issueToken("verify", user.id);
   await sendEmail({
     to: user.email,
-    subject: "Confirm your email for Podcast Clipper",
+    subject: `Confirm your email for ${BRAND.productName}`,
     text:
       `Confirm your email to start making clips (and get ${SIGNUP_CREDITS} free credits):\n\n` +
       `${env.BASE_URL}/verify-email?token=${token}\n\n` +
@@ -63,7 +64,7 @@ export async function requestPasswordReset(email: string) {
   const token = await issueToken("reset", user.id);
   await sendEmail({
     to: user.email,
-    subject: "Reset your Podcast Clipper password",
+    subject: `Reset your ${BRAND.productName} password`,
     text:
       `Choose a new password:\n\n${env.BASE_URL}/reset-password?token=${token}\n\n` +
       "The link works for one hour. If you didn't ask for this, ignore this email; your password hasn't changed.",

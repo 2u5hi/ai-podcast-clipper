@@ -1,3 +1,4 @@
+import { BRAND } from "~/config/brand";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "~/components/ui/button";
@@ -10,14 +11,14 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+    <main className="bg-background flex min-h-screen flex-col items-center justify-center px-4">
       <div className="flex max-w-2xl flex-col items-center gap-6 text-center">
         <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
-          AI Podcast Clipper
+          {BRAND.productName}
         </h1>
         <p className="text-muted-foreground text-lg">
-          Paste a YouTube link or upload a video, and get vertical, captioned
-          short-form clips ready for TikTok, Shorts, and Reels.
+          Upload a podcast or video and get vertical, captioned short-form clips
+          ready for TikTok, Shorts, and Reels.
         </p>
         <div className="flex gap-4">
           <Button asChild size="lg">

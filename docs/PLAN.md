@@ -12,8 +12,9 @@ clips. A creator uploads an episode, buys credits, and downloads clips ready for
 The clipper is a product of **Soushi Technologies** (chosen 2026-10-09), the parent company; whether products later
 sit in their own subsidiaries is decided when one needs it. Soushi is the legal operator (terms,
 privacy policy, Stripe, invoices) and also does tech solutions and AI integration work, and can run other
-products later. The product gets its own descriptive name, not chosen yet. Both live in
-`src/config/brand.ts`. DailyTech stays the name of the social accounts, and DAILYTECH.AI stays the house watermark on free clips for
+products later. The product is **DivClip**, shown as the div/clip wordmark (chosen 2026-10-09; DivClipt was dropped because it
+contains "Clipt", an existing AI clipping tool's name). Both live in `src/config/brand.ts`, with the support
+address (the founder's inbox until the domain has one) and Georgia as governing law. DailyTech stays the name of the social accounts, and DAILYTECH.AI stays the house watermark on free clips for
 now (decided 2026-10-09). "Soushi AI" was ruled out: Soshi
 (soshi.io) is a funded AI social-media-marketing startup, too close in name and market.
 
@@ -55,7 +56,7 @@ Each becomes an ADR when it is made.
 
 | Decision | Why it's open |
 |---|---|
-| Product name, support email, governing law | Needed by the legal pages (Phase 1 commit 8); placeholders in `src/config/brand.ts` until then. Governing law is likely Georgia, where the founder is based. The company's legal form (LLC or otherwise) is a question for a Georgia CPA or lawyer, and should be settled before Stripe is verified for live payments (commit 9), since the Stripe account belongs to that entity |
+| Company legal form | Soushi Technologies isn't formed yet. LLC or otherwise is a question for a Georgia CPA or lawyer, and should be settled before Stripe is verified for live payments (commit 9), since the Stripe account belongs to that entity |
 | Keep YouTube URL ingestion for paying users? | Downloading from YouTube conflicts with its terms of service, and Modal's IPs get bot-checked. Off by default ([ADR 0012](adr/0012-youtube-off-for-customers.md)); turning it on needs terms that cover it |
 | What a credit buys, and pack prices | Today a credit is one clip. Per-minute-of-source pricing tracks GPU cost better. Needs real cost-per-job numbers first (Phase 2) ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
 

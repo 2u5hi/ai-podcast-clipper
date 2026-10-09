@@ -1,11 +1,12 @@
+import { BRAND } from "~/config/brand";
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 
 export const metadata: Metadata = {
-  title: "Podcast Clipper",
-  description: "Podcast Clipper",
+  title: BRAND.productName,
+  description: "Turn long podcasts and videos into captioned vertical clips.",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
