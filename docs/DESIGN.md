@@ -183,6 +183,7 @@ Frontend variables are validated at startup by `src/env.js` (`@t3-oss/env-nextjs
 | `STRIPE_*`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Checkout and webhook |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, `INNGEST_DEV` | Inngest client; `INNGEST_DEV=1` locally |
 | `BASE_URL` | Checkout success redirect |
+| `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_HOST`, `SMTP_PORT`, `EMAIL_FROM`, `RESEND_API_KEY` | Email: Resend if it has a key, else SMTP (Gmail on the free launch), else the dev log; production needs one ([ADR 0017](adr/0017-launch-on-free-tiers.md)) |
 
 ## 10. Observability
 

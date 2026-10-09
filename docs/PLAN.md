@@ -43,12 +43,13 @@ a public API, and posting directly to social platforms (until Phase 4).
 
 | Layer | Service | Notes |
 |---|---|---|
-| Web app + server actions | Vercel (Next.js 16) | The production project gets re-pointed at this repo in Phase 1; the old `dark-pheonix-dev` deploy is retired |
+| Web app + server actions | Netlify free or Vercel Hobby, on the free subdomain (ADR 0017) | The old `dark-pheonix-dev` Vercel project is retired at launch |
 | Job queue | Inngest Cloud | Durable steps, one job per user at a time |
 | GPU pipeline | Modal, L40S | Scales to zero; weights baked into the image |
-| Database | Supabase Postgres | Moves to a paid plan in Phase 1 so it stops auto-pausing |
+| Database | Supabase Postgres, free plan | A daily keep-alive ping stops it pausing (ADR 0017) |
 | Storage | AWS S3, us-east-2 | Signed PUT for uploads, signed GET for playback |
-| Payments | Stripe | Test mode until Phase 1's last commit |
+| Payments | Stripe | Test mode until Phase 1's last commit; activated as an individual |
+| Email | Gmail SMTP (app password) | Resend once there's a domain (ADR 0017) |
 
 ## Open decisions
 
@@ -56,8 +57,9 @@ Each becomes an ADR when it is made.
 
 | Decision | Why it's open |
 |---|---|
-| Company legal form | Soushi Technologies isn't formed yet. LLC or otherwise is a question for a Georgia CPA or lawyer, and should be settled before Stripe is verified for live payments (commit 9), since the Stripe account belongs to that entity |
+| Company legal form | Soushi Technologies isn't formed yet, and won't be until the product sells (ADR 0017): Stripe is activated as an individual. A Georgia CPA or lawyer can advise on LLC or otherwise when it's time; moving Stripe to a company account later is a migration to plan for |
 | Keep YouTube URL ingestion for paying users? | Downloading from YouTube conflicts with its terms of service, and Modal's IPs get bot-checked. Off by default ([ADR 0012](adr/0012-youtube-off-for-customers.md)); turning it on needs terms that cover it |
+| Web host | Netlify free (commercial use appears allowed) or Vercel Hobby (non-commercial only); see ADR 0017 |
 | What a credit buys, and pack prices | Today a credit is one clip. Per-minute-of-source pricing tracks GPU cost better. Needs real cost-per-job numbers first (Phase 2) ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
 
 Settled: the company name is Soushi Technologies. Free credits at sign-up are granted only once an email is confirmed, with sign-ups rate-limited

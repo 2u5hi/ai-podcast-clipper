@@ -44,7 +44,7 @@ Read from the code on 2026-10-09. Each one is fixed by a commit in §4 unless ma
 | F7 | Uploads accept any content type and size; the extension comes from the client's filename | `s3.ts:30` | Medium | 3 ✅ |
 | F8 | Clip tiles fail silently: a failed signed URL leaves a black player with only a console error (BUG-1) | `clip-display.tsx:20` | Medium | 6 ✅ |
 | F9 | No rate limits on sign-up, sign-in, or job submission; 10 free credits per account | `schema.prisma:63` | Medium | 5 ✅ |
-| F10 | Free-tier Supabase pauses after ~3 weeks idle; the app is fully down when it does | infra | High for launch | 9 |
+| F10 | Free-tier Supabase pauses after ~3 weeks idle; the app is fully down when it does | infra | High for launch | 9 (keep-alive, ADR 0017) |
 | F11 | Leftovers: T3 `Post` model, unused `Account`/`Session` tables under JWT sessions, a QA account with a trivial password | `schema.prisma` | Low | 9 |
 | F12 | Modal web endpoints answer any request longer than 150s with a 303 redirect while the job keeps running (seen in the 2026-10-09 smoke test: 303 at 150.8s, clips landed afterwards). Whether Inngest's `step.fetch` follows it is unverified; this is the likely source of the "timed-out but successful" runs that [ADR 0009](adr/0009-recover-runs-from-s3.md) recovers | `functions.ts` `step.fetch` | Medium | Phase 2 |
 | F13 | Next 16 dev logging printed server-action arguments — sign-up and sign-in passwords — and `observability/` ships dev logs to Loki | `next.config.js` | High (dev) | 3 ✅ |
@@ -93,16 +93,26 @@ deploy moved to 8 and 9.
 | 6 ✅ | `feat(jobs): states and errors users can see` | `JobStatus` enum (in-place migration of the old strings) and `failureReason`; reasons mapped from the worker's status, never the raw error; the worker refuses files without video and audio (ffprobe, 422) before GPU work; dashboard shows Failed + reason + "Credits refunded", "No clip-worthy moments found" for empty runs, and refreshes itself while jobs run; clip tiles show an error with Retry; `cleanup-stale-jobs` keeps failed jobs | A job forced to fail shows "Failed — credits refunded" and a reason; a clip whose URL 403s shows an error tile, not a black player |
 | 7 ✅ | `feat(watermark): the company's mark on free clips, the creator's on paid ones` | Company and product identity (names, support email, governing country, house watermark text) in one config file with marked placeholders, used by the watermark, emails, and later the legal pages; a per-job watermark sent to Modal instead of the global `WATERMARK_TEXT`, drawn from a text file so no user text is ever parsed by ffmpeg; the house watermark on jobs paid with free credits; a settings page where accounts that have bought credits set their own watermark text or none (rule: per account, ADR 0016); billing copy corrected (F15) | A job on sign-up credits carries the house watermark; after a purchase, clips carry the creator's text or none; text with quotes, colons, `%`, and backslashes renders literally |
 | 8 ✅ | `feat(web): pricing, terms, privacy, and refund pages` | Public `/pricing`, `/terms`, `/privacy`, `/refunds` drawn from `src/config/brand.ts`; terms name Soushi Technologies as operator, require uploaders to own their content, give a copyright-complaint process, and set Georgia law; privacy lists every service that receives data; refunds: automatic credit returns plus unused packs within 14 days; credit packs defined once (`src/config/pricing.ts`) for the billing and pricing pages; site-wide footer; agreement note at sign-up and checkout | Every page is reachable without signing in and linked from the footer and checkout |
-| 9 | `feat(deploy): production environment` | Step by step in [`DEPLOY.md`](DEPLOY.md). Done so far: unused `Post`/`Account`/`Session` tables and the Auth.js adapter removed (migration 5); `vercel-build` applies migrations on production deploys only; `npm run smoke` checks public pages, a real sign-in, and the signed-in pages against any URL; least-privilege IAM policy and S3 CORS in `infra/`. Stripe refunds take a pack's credits back, capped at the balance and once per event (F17, migration 6). Still to do: the owner's accounts and credentials (DEPLOY.md A–C); deploy and verify (D). S3 lifecycle for originals moves to Phase 2: originals and clips share a prefix, so a lifecycle rule needs a key layout change first. Sentry is optional at launch | A real card buys a small pack on the live domain, the clips download, the purchase is refunded and its credits removed, and the smoke test passes against production |
+| 9 | `feat(deploy): production environment` | Step by step in [`DEPLOY.md`](DEPLOY.md). Done so far: unused `Post`/`Account`/`Session` tables and the Auth.js adapter removed (migration 5); `vercel-build` applies migrations on production deploys only; `npm run smoke` checks public pages, a real sign-in, and the signed-in pages against any URL; least-privilege IAM policy and S3 CORS in `infra/`. Stripe refunds take a pack's credits back, capped at the balance and once per event (F17, migration 6). Free-tier launch (ADR 0017): `/api/health` and a daily GitHub Actions keep-alive stop Supabase's free plan pausing; Gmail SMTP sends email without a domain. Still to do: the owner picks a host and sets up the free accounts and credentials (DEPLOY.md A–C); deploy and verify (D). S3 lifecycle for originals moves to Phase 2: originals and clips share a prefix, so a lifecycle rule needs a key layout change first. Sentry is optional at launch | A real card buys a small pack on the live site, the clips download, the purchase is refunded and its credits removed, and the smoke test passes against production |
 
 ---
 
 ## 5. Operator tasks
 
-Things only the account owner can do. Start the slow ones first.
+Things only the account owner can do. All free (ADR 0017); [`DEPLOY.md`](DEPLOY.md) has the order and details.
 
 | Task | Blocks | Lead time |
 |---|---|---|
+| Pick the host: Netlify free or Vercel Hobby | 9 | Minutes |
+| Create the host site from the repo; set its environment variables | 9 | An hour |
+| Gmail app password for sending email | 9 | Minutes |
+| Inngest Cloud production app | 9 | Minutes |
+| GitHub repo variable `APP_URL` for the keep-alive | 9 | Minutes |
+| Stripe: activate live payments as an individual | 9 (the real purchase) | Days |
+| Reset the Supabase database password | 9 | Minutes |
+| Optional: DMCA agent (~$6), lawyer review | — | — |
+
+---|---|---|
 | Choose the company name, product name, support email, and governing country; decide whether to form a company (a local accountant or lawyer can say whether it's worth it) | 8 (7 can use placeholders) | Your call |
 | ~~Decide the Gemini API tier (F16)~~ Done: paid and free tiers both used, disclosed in the privacy policy | 9 | — |
 | Have a lawyer review the terms, privacy, and refund pages (drafted in plain language from how the app works; not legal advice) | 9 | Days |

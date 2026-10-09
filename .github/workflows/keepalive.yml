@@ -1,0 +1,27 @@
+name: keepalive
+
+# Supabase's free plan pauses a project after a week with little database activity (ADR 0017).
+# One request a day to /api/health, which runs a single query, keeps it awake. Free on a public repo.
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # set the repository variable APP_URL (Settings → Secrets and variables → Actions → Variables)
+      # to the live site, e.g. https://divclip.netlify.app
+      - name: Ping the health check
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "::notice::APP_URL isn't set yet; nothing to ping"
+            exit 0
+          fi
+          curl --fail --silent --show-error --retry 3 --retry-delay 20 --max-time 60 "$APP_URL/api/health"

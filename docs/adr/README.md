@@ -21,3 +21,4 @@ One file per decision: the context, what was decided, where it lives in the code
 | [0014](0014-prisma-migrations.md) | Schema changes are Prisma migrations from a verified baseline; `db push` is retired | Persistence |
 | [0015](0015-verified-rate-limited-accounts.md) | Accounts are verified before they spend; emails lowercase; rate limits in Postgres; Resend for mail | Auth |
 | [0016](0016-watermark-per-account.md) | The company's watermark on free clips; paying creators choose their own text or none; text drawn from a file, never parsed | Pipeline |
+| [0017](0017-launch-on-free-tiers.md) | Launch on free tiers: Supabase free with a daily keep-alive, Gmail SMTP, the host's free subdomain; host still to choose | Platform |

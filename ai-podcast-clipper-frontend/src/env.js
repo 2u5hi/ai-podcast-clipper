@@ -27,15 +27,14 @@ export const env = createEnv({
     STRIPE_LARGE_CREDIT_PACK: z.string(),
     BASE_URL: z.string(),
     STRIPE_WEBHOOK_SECRET: z.string(),
-    // verification and password-reset email; in development without a key, links are printed to the server log
-    RESEND_API_KEY:
-      process.env.NODE_ENV === "production"
-        ? z.string()
-        : z.string().optional(),
-    EMAIL_FROM:
-      process.env.NODE_ENV === "production"
-        ? z.string()
-        : z.string().optional(),
+    // verification and password-reset email (ADR 0017): Resend if it has a key, otherwise SMTP (Gmail with an
+    // app password on the free launch); src/server/mailer.ts refuses to run in production with neither
+    RESEND_API_KEY: z.string().optional(),
+    SMTP_HOST: z.string().default("smtp.gmail.com"),
+    SMTP_PORT: z.coerce.number().int().default(465),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
+    EMAIL_FROM: z.string().optional(),
     // YouTube links are off unless explicitly enabled (ADR 0012)
     YOUTUBE_INGESTION_ENABLED: z
       .enum(["true", "false"])
@@ -78,6 +77,10 @@ export const env = createEnv({
     YOUTUBE_INGESTION_ENABLED: process.env.YOUTUBE_INGESTION_ENABLED,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
+    SMTP_HOST: process.env.SMTP_HOST,
+    SMTP_PORT: process.env.SMTP_PORT,
+    SMTP_USER: process.env.SMTP_USER,
+    SMTP_PASSWORD: process.env.SMTP_PASSWORD,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
