@@ -10,6 +10,15 @@ Built on top of [Andreas Trolle's open-source ai-podcast-clipper](https://github
 (MIT). This fork adds server-side YouTube ingestion, a burned-in configurable
 watermark, hardened LLM moment-selection, and an end-to-end cloud deployment.
 
+**Status:** Phase 0 (working demo) complete. Phase 1 — hardening for a paid
+launch: security fixes, correct billing, verified accounts, tests and CI,
+production infrastructure — is in progress. Stripe is in test mode until then.
+
+- [docs/PLAN.md](docs/PLAN.md) — the finished product and the phases to get there
+- [docs/LAUNCH_PLAN.md](docs/LAUNCH_PLAN.md) — Phase 1, commit by commit, with the open findings
+- [docs/DESIGN.md](docs/DESIGN.md) — how the system works today
+- [docs/adr/](docs/adr/README.md) — decisions made along the way
+
 ## Architecture
 
 ```
