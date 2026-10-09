@@ -1,0 +1,11 @@
+{
+  "CORSRules": [
+    {
+      "AllowedHeaders": ["Content-Type", "Content-Length"],
+      "AllowedMethods": ["PUT", "GET", "HEAD"],
+      "AllowedOrigins": ["https://divclip.com", "https://www.divclip.com", "http://localhost:3000"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}

@@ -1,4 +1,3 @@
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import {
   CredentialsSignin,
   type DefaultSession,
@@ -77,7 +76,6 @@ export const authConfig = {
     }),
   ],
   session: { strategy: "jwt" },
-  adapter: PrismaAdapter(db),
   callbacks: {
     session: ({ session, token }) => ({
       ...session,

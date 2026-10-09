@@ -101,7 +101,9 @@ and design notes (labels vs. content, ingestion vs. event time).
    ```
 4. Put the Modal endpoint URL in `PROCESS_VIDEO_ENDPOINT`, set a shared bearer
    token in both `PROCESS_VIDEO_ENDPOINT_AUTH` (frontend) and the Modal
-   secret's `AUTH_TOKEN`, and configure S3 CORS for your domain (`cors.json`).
+   secret's `AUTH_TOKEN`, and configure S3 CORS for your domain (`infra/s3-cors.json`).
+
+Production deployment, step by step: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Credits
 

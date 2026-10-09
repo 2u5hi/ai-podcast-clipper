@@ -7,7 +7,7 @@
     "dev": "next dev --turbo",
     "inngest-dev": "npx inngest-cli@latest dev",
     "db:studio": "prisma studio",
-    "db:push": "prisma db push",
+    "db:push": "echo \"db push is retired (ADR 0014): add a migration in prisma/migrations instead\" && exit 1",
     "build": "next build",
     "check": "eslint . && tsc --noEmit",
     "db:generate": "prisma migrate dev",
@@ -20,10 +20,11 @@
     "preview": "next build && next start",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "vercel-build": "node scripts/vercel-build.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.7.2",
     "@aws-sdk/client-s3": "^3.806.0",
     "@aws-sdk/s3-request-presigner": "^3.808.0",
     "@hookform/resolvers": "^5.0.1",
