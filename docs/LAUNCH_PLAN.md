@@ -44,8 +44,8 @@ Read from the code on 2026-10-09. Each one is fixed by a commit in §4 unless ma
 | F7 | Uploads accept any content type and size; the extension comes from the client's filename | `s3.ts:30` | Medium | 3 ✅ |
 | F8 | Clip tiles fail silently: a failed signed URL leaves a black player with only a console error (BUG-1) | `clip-display.tsx:20` | Medium | 6 ✅ |
 | F9 | No rate limits on sign-up, sign-in, or job submission; 10 free credits per account | `schema.prisma:63` | Medium | 5 ✅ |
-| F10 | Free-tier Supabase pauses after ~3 weeks idle; the app is fully down when it does | infra | High for launch | 8 |
-| F11 | Leftovers: T3 `Post` model, unused `Account`/`Session` tables under JWT sessions, a QA account with a trivial password | `schema.prisma` | Low | 8 |
+| F10 | Free-tier Supabase pauses after ~3 weeks idle; the app is fully down when it does | infra | High for launch | 9 |
+| F11 | Leftovers: T3 `Post` model, unused `Account`/`Session` tables under JWT sessions, a QA account with a trivial password | `schema.prisma` | Low | 9 |
 | F12 | Modal web endpoints answer any request longer than 150s with a 303 redirect while the job keeps running (seen in the 2026-10-09 smoke test: 303 at 150.8s, clips landed afterwards). Whether Inngest's `step.fetch` follows it is unverified; this is the likely source of the "timed-out but successful" runs that [ADR 0009](adr/0009-recover-runs-from-s3.md) recovers | `functions.ts` `step.fetch` | Medium | Phase 2 |
 | F13 | Next 16 dev logging printed server-action arguments — sign-up and sign-in passwords — and `observability/` ships dev logs to Loki | `next.config.js` | High (dev) | 3 ✅ |
 | F14 | A valid session for an account that no longer exists makes the dashboard throw instead of sending the person to log in (seen while testing against a fresh database) | `dashboard/layout.tsx`, `dashboard/page.tsx` | Low | Phase 2 |
@@ -62,10 +62,11 @@ Read from the code on 2026-10-09. Each one is fixed by a commit in §4 unless ma
 5. **Tests and CI** — unit tests for the money paths, a pipeline test for moment filtering, a Playwright smoke test, all on every push.
 6. **Legal and storefront** — terms, privacy, refund policy, pricing page, support contact.
 7. **Production infrastructure** — paid Supabase, Vercel project on this repo with a custom domain, Sentry, S3 lifecycle and CORS applied.
+8. **Branding** — the company and product names in one place; the company's watermark on clips made with free credits, the creator's own text (or none) on paid ones.
 
 ### Later phases
-Job progress and email notifications, cost tracking, admin view (Phase 2); clip options, brand kit, trimming
-(Phase 3); social sign-in and direct publishing (Phase 4). See [`PLAN.md`](PLAN.md).
+Job progress and email notifications, cost tracking, admin view (Phase 2); clip options, the full brand kit
+(logo images, fonts, colours, placement), trimming (Phase 3); social sign-in and direct publishing (Phase 4). See [`PLAN.md`](PLAN.md).
 
 ### Not in Phase 1
 A decision on keeping YouTube ingestion is made in commit 3 (upload-only by default), but making it reliable is not
@@ -73,10 +74,11 @@ in scope.
 
 ---
 
-## 4. Work plan — eight commits
+## 4. Work plan — nine commits
 
 Each is one commit, with tests, docs (an ADR when a decision is made), and a short review summary.
-"Done when" is what done means.
+"Done when" is what done means. Commit 7 (watermarks) was added on 2026-10-09; the legal pages and the
+deploy moved to 8 and 9.
 
 | # | Commit | Contents | Done when |
 |---|---|---|---|
@@ -86,8 +88,9 @@ Each is one commit, with tests, docs (an ADR when a decision is made), and a sho
 | 4 ✅ | `fix(billing): idempotent credits that match the work` | `CreditLedgerEntry` with a unique Stripe event id, written in the same transaction as every balance change (opening rows backfilled); `CHECK (credits >= 0)`; jobs reserve up to 5 credits, ask Modal for at most that many clips (`max_clips`), and refund what wasn't delivered — all of it on failure; sign-up credits through the ledger; Prisma migrations from a verified baseline replace `db push`; billing tests on a real Postgres in CI; ADRs 0013, 0014. The credit unit stays one clip until cost data exists | Replaying the same webhook three times adds credits once; a failed job leaves the balance unchanged; every balance equals the sum of its ledger rows |
 | 5 ✅ | `feat(auth): verified, rate-limited accounts` | Emails lowercased by the schemas and a database `CHECK`; email verification (button-press confirm) and password reset with hashed single-use tokens; Resend mailer with a dev fallback that prints links; rate limits as Postgres counters (no Upstash); 10 free credits granted once on verification; uploads, jobs, YouTube, and checkout require a verified email; ADR 0015 | An unverified account can't start a job; `Qa@Gmail.com` and `qa@gmail.com` are one account; the 11th sign-in attempt in a minute is refused |
 | 6 ✅ | `feat(jobs): states and errors users can see` | `JobStatus` enum (in-place migration of the old strings) and `failureReason`; reasons mapped from the worker's status, never the raw error; the worker refuses files without video and audio (ffprobe, 422) before GPU work; dashboard shows Failed + reason + "Credits refunded", "No clip-worthy moments found" for empty runs, and refreshes itself while jobs run; clip tiles show an error with Retry; `cleanup-stale-jobs` keeps failed jobs | A job forced to fail shows "Failed — credits refunded" and a reason; a clip whose URL 403s shows an error tile, not a black player |
-| 7 | `feat(web): pricing, terms, privacy, and refund pages` | Public pricing page, terms of service (including "you must own the rights to what you upload"), privacy policy, refund policy, support email in the footer | Every page is reachable without signing in and linked from the footer and checkout |
-| 8 | `feat(deploy): production environment` | Supabase on a paid plan; Vercel project on this repo with a custom domain and production env; Stripe live products, prices, and webhook; Sentry for web and Modal; IAM user with Get/Put/List on one bucket; S3 CORS and a lifecycle rule for originals; secrets rotated; `Post`/`Account`/`Session` removed; QA account deleted; Playwright smoke test against production | A real card buys a small pack on the live domain, the clips download, the purchase is refunded, and Sentry shows the run's traces |
+| 7 | `feat(watermark): the company's mark on free clips, the creator's on paid ones` | Company and product identity (names, support email, governing country, house watermark text) in one config file with marked placeholders, used by the watermark, emails, and later the legal pages; a per-job watermark sent to Modal instead of the global `WATERMARK_TEXT`, drawn from a text file so no user text is ever parsed by ffmpeg; the house watermark on jobs paid with free credits; a settings page where accounts that have bought credits set their own watermark text or none; ADR superseding 0007 | A job on sign-up credits carries the house watermark; after a purchase, clips carry the creator's text or none; text with quotes, colons, `%`, and backslashes renders literally |
+| 8 | `feat(web): pricing, terms, privacy, and refund pages` | Public pricing page (including what the watermark rule means for free and paid credits), terms of service naming the operating company (including "you must own the rights to what you upload"), privacy policy, refund policy, support email in the footer | Every page is reachable without signing in and linked from the footer and checkout |
+| 9 | `feat(deploy): production environment` | Supabase on a paid plan; Vercel project on this repo with a custom domain and production env; Stripe live products, prices, and webhook; Sentry for web and Modal; IAM user with Get/Put/List on one bucket; S3 CORS and a lifecycle rule for originals; secrets rotated; `Post`/`Account`/`Session` removed; QA account deleted; Playwright smoke test against production | A real card buys a small pack on the live domain, the clips download, the purchase is refunded, and Sentry shows the run's traces |
 
 ---
 
@@ -97,12 +100,13 @@ Things only the account owner can do. Start the slow ones first.
 
 | Task | Blocks | Lead time |
 |---|---|---|
-| Stripe business verification and bank account for live mode | 8 | Days |
-| Upgrade Supabase to Pro | 8 | Minutes |
-| Buy a domain and point it at Vercel | 7, 8 | Minutes to hours |
-| Create a Resend account and verify the sending domain (Upstash is no longer needed, ADR 0015) | 8 | Minutes, plus DNS |
-| Rotate AWS, Stripe, Gemini, Modal auth, `AUTH_SECRET`, and database credentials | 8 | An hour |
-| Attach the Get/Put/List policy to the `dark-phoenix-dev` IAM user | 8 | Minutes |
+| Choose the company name, product name, support email, and governing country; decide whether to form a company (a local accountant or lawyer can say whether it's worth it) | 8 (7 can use placeholders) | Your call |
+| Stripe business verification and bank account for live mode | 9 | Days |
+| Upgrade Supabase to Pro | 9 | Minutes |
+| Buy a domain and point it at Vercel | 8, 9 | Minutes to hours |
+| Create a Resend account and verify the sending domain (Upstash is no longer needed, ADR 0015) | 9 | Minutes, plus DNS |
+| Rotate AWS, Stripe, Gemini, Modal auth, `AUTH_SECRET`, and database credentials | 9 | An hour |
+| Attach the Get/Put/List policy to the `dark-phoenix-dev` IAM user | 9 | Minutes |
 
 ---
 

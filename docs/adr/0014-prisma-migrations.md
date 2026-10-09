@@ -16,4 +16,4 @@ That was fine for a demo. The credit ledger ([ADR 0013](0013-credit-ledger-reser
 ## Consequences
 - Schema history is reviewable in git, and production gets the same SQL the tests ran.
 - `npm run db:push` should no longer be used against a real database.
-- Production deploys (Phase 1 commit 8) need a `prisma migrate deploy` step.
+- Production deploys (Phase 1 commit 9) need a `prisma migrate deploy` step.

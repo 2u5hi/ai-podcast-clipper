@@ -9,9 +9,15 @@ phases get the same treatment when they start. Decisions along the way are in [`
 A self-serve SaaS that turns long-form podcasts and interviews into vertical, captioned, branded short-form
 clips. A creator uploads an episode, buys credits, and downloads clips ready for TikTok, Shorts, and Reels.
 
+The clipper is a product of a company: the company is the legal operator (terms, privacy policy, Stripe,
+invoices) and can run other products later; the product has its own descriptive name. Neither name is chosen
+yet, so both live in one config file with placeholders (Phase 1 commit 7). DailyTech stays the name of the
+social accounts.
+
 | Pillar | What it means here |
 |---|---|
 | **Clip quality** | An LLM picks self-contained 30–60s moments; speaker tracking reframes to 9:16; captions and a watermark are burned into the MP4 |
+| **Branding** | Clips made with free credits carry the company's watermark (free marketing wherever they're posted); paying creators get their own text watermark or none, at no extra cost; logo images and the rest of the brand kit come in Phase 3 |
 | **Trustworthy billing** | Credits are bought through Stripe and charged only for work delivered; failed jobs cost nothing; every credit change is traceable |
 | **Accounts** | Verified email, password reset, rate-limited sign-in; each user sees only their own files and clips |
 | **Runs unattended** | Durable jobs with visible states, alerts when something breaks, a database that doesn't pause, costs known per job |
@@ -26,7 +32,7 @@ a public API, and posting directly to social platforms (until Phase 4).
 | 0 ✅ | **Working demo** | Upload → transcribe → pick moments → reframe → captions → watermark → dashboard; Stripe in test mode; deployed on Vercel + Modal + Supabase + S3 | One video produces watermarked, captioned clips end to end (done June 2026) |
 | 1 | **Sellable launch** | Security fixes, correct billing, verified accounts, rate limits, tests and CI, legal pages, production infrastructure, Stripe live | A stranger can sign up, verify their email, buy credits with a real card, upload an episode, and download clips; a failed job refunds itself; CI is green; no known security issue is open |
 | 2 | **Reliability + operations** | Job progress and failure reasons in the UI, "clips ready" email, Sentry and alerting, per-job cost tracking, S3 lifecycle rules, an admin view of jobs and credits | A job that fails at any step shows why, refunds, and pages the operator; the cost of each job is recorded next to what it charged |
-| 3 | **Product depth** | Choice of clip count and length, caption styles, a per-user brand kit (watermark text, colors), trimming a clip's start/end, bulk download | A user can restyle and re-render a clip without reprocessing the whole episode |
+| 3 | **Product depth** | Choice of clip count and length, caption styles, the full brand kit (logo images, fonts, colours, placement; the text watermark arrives in Phase 1), trimming a clip's start/end, bulk download | A user can restyle and re-render a clip without reprocessing the whole episode |
 | 4 | **Growth** | Social sign-in, publishing straight to YouTube/TikTok, referral credits, a pricing experiment, team seats | A clip can go from upload to a scheduled post without leaving the app |
 
 ## Where it runs
@@ -46,6 +52,11 @@ Each becomes an ADR when it is made.
 
 | Decision | Why it's open |
 |---|---|
-| Keep YouTube URL ingestion for paying users? | Downloading from YouTube conflicts with its terms of service, and Modal's IPs get bot-checked. Upload-only is the safe launch default ([ADR 0008](adr/0008-youtube-ingestion.md)) |
-| What a credit buys | Today a credit is one clip. Per-minute-of-source pricing tracks GPU cost better. Needs real cost-per-job numbers first |
-| Free credits at signup | The schema default is 10. Without email verification and rate limits, that is free GPU time for anyone with throwaway inboxes |
+| Company name, product name, support email, governing country | Needed by the legal pages (Phase 1 commit 8); placeholders until then. Whether to form a company before taking payments is a question for a local accountant or lawyer; without one, the terms name the founder as the operator |
+| Watermark rule: per account or per credit | Proposed for commit 7: an account that has bought credits gets its own watermark (or none) on every job; until then, the company's. The alternative — tracking free and paid credits separately and branding each job by which it spent — is fairer to free credits held after a purchase but needs two balances. Confirm before commit 7 |
+| Keep YouTube URL ingestion for paying users? | Downloading from YouTube conflicts with its terms of service, and Modal's IPs get bot-checked. Off by default ([ADR 0012](adr/0012-youtube-off-for-customers.md)); turning it on needs terms that cover it |
+| What a credit buys, and pack prices | Today a credit is one clip. Per-minute-of-source pricing tracks GPU cost better. Needs real cost-per-job numbers first (Phase 2) ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
+
+Settled: free credits at sign-up are granted only once an email is confirmed, with sign-ups rate-limited
+([ADR 0015](adr/0015-verified-rate-limited-accounts.md)). Custom watermarks are not sold per clip: branding is
+a reason to buy credits, not a surcharge on them.

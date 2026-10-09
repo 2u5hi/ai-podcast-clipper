@@ -10,7 +10,7 @@ non-idempotent payment webhook, and a database that pauses itself when idle
 
 ## Decision
 Phase 1 is a sellable launch: security, billing correctness, verified accounts, tests and CI, legal pages, and
-production infrastructure, in eight commits, before any new user-facing feature. Planning follows the same
+production infrastructure, in eight commits (nine since watermarks were added as commit 7 on 2026-10-09), before any new user-facing feature. Planning follows the same
 shape as the project's other repositories: [`PLAN.md`](../PLAN.md) for the product and its phases, a
 commit-by-commit plan per phase with "done when" criteria, a living [`DESIGN.md`](../DESIGN.md), and an ADR for
 each real decision.

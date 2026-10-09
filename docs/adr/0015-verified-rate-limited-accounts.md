@@ -41,7 +41,7 @@ printed to the server log.
 
 ## Consequences
 - Throwaway sign-ups cost a working inbox per 10 credits, and 10 per hour per address.
-- Production can't send mail until a Resend account has a verified sending domain — part of Phase 1 commit 8, with the custom domain.
+- Production can't send mail until a Resend account has a verified sending domain — part of Phase 1 commit 9, with the custom domain.
 - A rate-limit check costs one database round trip; at this scale that's negligible, and the table can move to Redis later without changing callers.
 - Sessions are still JWTs ([ADR 0006](0006-credentials-auth-with-jwt.md)): a password reset doesn't sign out other devices.
 - Tested on a real Postgres (`src/server/accounts.db.test.ts`); removing the lowercasing, the sign-in limit, the verified check, single-use tokens, or the once-only grant each makes a test fail.

@@ -14,4 +14,4 @@ Loki stores it, and Grafana on `:3001` shows a provisioned dashboard with anonym
 ## Consequences
 - Useful for local testing; nothing in it runs in production.
 - Anonymous admin is acceptable only on localhost.
-- Production error tracking is a separate decision (Sentry, Phase 1 commit 8); Modal and Inngest logs stay in their own dashboards.
+- Production error tracking is a separate decision (Sentry, Phase 1 commit 9); Modal and Inngest logs stay in their own dashboards.
