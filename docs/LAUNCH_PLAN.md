@@ -50,7 +50,7 @@ Read from the code on 2026-10-09. Each one is fixed by a commit in §4 unless ma
 | F13 | Next 16 dev logging printed server-action arguments — sign-up and sign-in passwords — and `observability/` ships dev logs to Loki | `next.config.js` | High (dev) | 3 ✅ |
 | F14 | A valid session for an account that no longer exists makes the dashboard throw instead of sending the person to log in (seen while testing against a fresh database) | `dashboard/layout.tsx`, `dashboard/page.tsx` | Low | Phase 2 |
 | F15 | The billing page told buyers "1 credit = 1 minute of podcast processing" and that longer podcasts cost more; billing is one credit per delivered clip, at most 5 per video | `billing/page.tsx` | Medium (misleading buyers) | 7 ✅ |
-| F16 | The Gemini API key is on the free tier, where Google may use prompts and responses (users' transcripts) to improve its products and have people review them; the privacy policy describes the paid tier | Modal secret `GEMINI_API_KEY` | High for launch | 9 |
+| F16 | The Gemini API key is on the free tier, where Google may use prompts and responses (users' transcripts) to improve its products and have people review them; the privacy policy describes the paid tier | Modal secret `GEMINI_API_KEY` | High for launch | ✅ (owner switched the key's project to paid, 2026-10-09) |
 
 ---
 
@@ -103,7 +103,7 @@ Things only the account owner can do. Start the slow ones first.
 | Task | Blocks | Lead time |
 |---|---|---|
 | Choose the company name, product name, support email, and governing country; decide whether to form a company (a local accountant or lawyer can say whether it's worth it) | 8 (7 can use placeholders) | Your call |
-| Switch the Gemini API key to a paid (billing-enabled) project, so transcripts aren't used for training (F16) | 9 | Minutes |
+| ~~Switch the Gemini API key to a paid (billing-enabled) project, so transcripts aren't used for training (F16)~~ Done 2026-10-09 | 9 | Minutes |
 | Have a lawyer review the terms, privacy, and refund pages (drafted in plain language from how the app works; not legal advice) | 9 | Days |
 | Register a DMCA designated agent with the US Copyright Office, for safe harbor on user uploads | 9 | Minutes |
 | Stripe business verification and bank account for live mode | 9 | Days |
