@@ -181,5 +181,7 @@ and Inngest have their own run logs in their dashboards. Production error tracki
 - YouTube downloads from Modal are often bot-checked; the reliable path is `ingest_youtube.py` run by an operator ([ADR 0008](adr/0008-youtube-ingestion.md)).
 - Transcription alignment is English-only.
 - First request after idle waits ~100s for a GPU container.
+- Modal answers any request longer than 150s with a 303 redirect while the job keeps running; the job function's S3 recovery ([ADR 0009](adr/0009-recover-runs-from-s3.md)) covers the case where the caller gives up (LAUNCH_PLAN F12).
+- A 75s source clip takes about 2.5 minutes end to end on a warm container and yields 2 clips (smoke test, 2026-10-09).
 - At most 5 clips per episode, fixed 9:16, one caption style.
 - Comments in `main.py` and `.gitignore` refer to a `DEPLOYMENT.md` that isn't in this repository.

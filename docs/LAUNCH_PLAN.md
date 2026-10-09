@@ -31,7 +31,7 @@ The deployed Vercel site is the old `dark-pheonix-dev` project, not this repo.
 
 ## 2. Findings from the October review
 
-Read from the code on 2026-10-09. Each one is fixed by a commit in §4.
+Read from the code on 2026-10-09. Each one is fixed by a commit in §4 unless marked for a later phase.
 
 | # | Finding | Where | Severity | Fixed in |
 |---|---|---|---|---|
@@ -46,6 +46,7 @@ Read from the code on 2026-10-09. Each one is fixed by a commit in §4.
 | F9 | No rate limits on sign-up, sign-in, or job submission; 10 free credits per account | `schema.prisma:63` | Medium | 5 |
 | F10 | Free-tier Supabase pauses after ~3 weeks idle; the app is fully down when it does | infra | High for launch | 8 |
 | F11 | Leftovers: T3 `Post` model, unused `Account`/`Session` tables under JWT sessions, a QA account with a trivial password | `schema.prisma` | Low | 8 |
+| F12 | Modal web endpoints answer any request longer than 150s with a 303 redirect while the job keeps running (seen in the 2026-10-09 smoke test: 303 at 150.8s, clips landed afterwards). Whether Inngest's `step.fetch` follows it is unverified; this is the likely source of the "timed-out but successful" runs that [ADR 0009](adr/0009-recover-runs-from-s3.md) recovers | `functions.ts` `step.fetch` | Medium | Phase 2 |
 
 ---
 
@@ -129,7 +130,8 @@ Say: *"Continue the podcast clipper — read docs/LAUNCH_PLAN.md."* Then:
 - If the database is unreachable, check whether Supabase has auto-paused before debugging anything else. TCP to the pooler still connects when it has; only a real query fails.
 - Local development needs `INNGEST_DEV=1` in the frontend `.env` and the Inngest dev server (`npm run inngest-dev`, port 8288). The production signing key rejects the local server.
 - On Windows, stop `next dev` before `prisma generate` (the query engine DLL is locked while it runs).
-- The Modal CLI needs `PYTHONUTF8=1` on Windows.
+- The Modal CLI needs `PYTHONUTF8=1` on Windows. It lives in `ai-podcast-clipper-backend/.venv` (Python 3.14; 3.10 is too old for current numpy). `modal deploy` imports `main.py` locally, so that venv also needs `main.py`'s top-level imports: `pip install modal boto3 opencv-python-headless numpy fastapi pydantic google-genai pysubs2 tqdm`.
+- Smoke-test the pipeline without the web app: upload a ~75s clip to `smoketest-<timestamp>/original.mp4` and POST `{"s3_key": ...}` to the Modal endpoint with the bearer token. A wrong token returning 401 is a cheap check that the image boots.
 - Modal cold start is about 100 seconds; a timeout on the first call after idle isn't an outage.
 - Tests: `npm test` and `npm run lint` in the frontend; `pip install -r requirements-dev.txt`, then `pytest -q` and `ruff check .` in the backend. The backend tests import only pure modules, so the GPU dependencies aren't needed.
 - The frontend's `.npmrc` sets `legacy-peer-deps=true`, so peer dependencies (e.g. `vite` for Vitest) must be installed explicitly.
