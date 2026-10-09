@@ -14,6 +14,7 @@ import {
 } from "./ui/card";
 import { Loader2, UploadCloud } from "lucide-react";
 import { useState } from "react";
+import { resendVerificationEmail } from "~/actions/auth";
 import { generateUploadUrl } from "~/actions/s3";
 import { toast } from "sonner";
 import { processVideo, processYouTubeUrl } from "~/actions/generation";
@@ -33,6 +34,7 @@ export function DashboardClient({
   uploadedFiles,
   clips,
   youtubeEnabled,
+  emailVerified,
 }: {
   uploadedFiles: {
     id: string;
@@ -44,12 +46,14 @@ export function DashboardClient({
   }[];
   clips: Clip[];
   youtubeEnabled: boolean;
+  emailVerified: boolean;
 }) {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [submittingYoutube, setSubmittingYoutube] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const router = useRouter();
 
   const handleRefresh = async () => {
@@ -75,6 +79,22 @@ export function DashboardClient({
       });
     } finally {
       setSubmittingYoutube(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendingVerification(true);
+    try {
+      const result = await resendVerificationEmail();
+      if (result.success) {
+        toast.success("Confirmation email sent", {
+          description: "Check your inbox for the link.",
+        });
+      } else {
+        toast.error("Couldn't send the email", { description: result.error });
+      }
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -143,6 +163,28 @@ export function DashboardClient({
         </Link>
       </div>
 
+      {!emailVerified && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardHeader>
+            <CardTitle>Confirm your email</CardTitle>
+            <CardDescription>
+              We sent you a link. Confirm your email to upload videos and get
+              your 10 free credits.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResendVerification}
+              disabled={resendingVerification}
+            >
+              {resendingVerification ? "Sending..." : "Resend email"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="upload">
         <TabsList>
           <TabsTrigger value="upload">Upload</TabsTrigger>
@@ -165,7 +207,7 @@ export function DashboardClient({
                 onDrop={handleDrop}
                 accept={{ "video/mp4": [".mp4"] }}
                 maxSize={500 * 1024 * 1024}
-                disabled={uploading}
+                disabled={uploading || !emailVerified}
                 maxFiles={1}
               >
                 {(dropzone: DropzoneState) => (
@@ -180,7 +222,7 @@ export function DashboardClient({
                         className="cursor-pointer"
                         variant="default"
                         size="sm"
-                        disabled={uploading}
+                        disabled={uploading || !emailVerified}
                       >
                         Select File
                       </Button>
@@ -203,7 +245,7 @@ export function DashboardClient({
                   )}
                 </div>
                 <Button
-                  disabled={files.length === 0 || uploading}
+                  disabled={files.length === 0 || uploading || !emailVerified}
                   onClick={handleUpload}
                 >
                   {uploading ? (

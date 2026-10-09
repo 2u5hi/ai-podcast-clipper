@@ -139,3 +139,13 @@ model CreditLedgerEntry {
 
   @@index([userId, createdAt])
 }
+
+// Fixed-window counters for rate limits (ADR 0015); one row per key per window.
+model RateLimit {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+}

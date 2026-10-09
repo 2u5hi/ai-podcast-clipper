@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import Stripe from "stripe";
 import { env } from "~/env";
-import { auth } from "~/server/auth";
+import { requireVerifiedUserId } from "~/server/accounts";
 import { db } from "~/server/db";
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
@@ -19,14 +19,11 @@ const PRICE_IDS: Record<PriceId, string> = {
 };
 
 export async function createCheckoutSession(priceId: PriceId) {
-  const serverSession = await auth();
-  if (!serverSession?.user.id) {
-    throw new Error("Unauthorized");
-  }
+  const userId = await requireVerifiedUserId();
 
   const user = await db.user.findUniqueOrThrow({
     where: {
-      id: serverSession.user.id,
+      id: userId,
     },
     select: { email: true, stripeCustomerId: true },
   });
@@ -39,7 +36,7 @@ export async function createCheckoutSession(priceId: PriceId) {
     });
     stripeCustomerId = customer.id;
     await db.user.update({
-      where: { id: serverSession.user.id },
+      where: { id: userId },
       data: { stripeCustomerId },
     });
   }

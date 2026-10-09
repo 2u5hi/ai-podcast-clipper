@@ -55,6 +55,8 @@ jobs:
       BASE_URL: http://localhost:3000
       INNGEST_EVENT_KEY: ci
       INNGEST_SIGNING_KEY: signkey-test-00
+      RESEND_API_KEY: re_ci
+      EMAIL_FROM: ci@example.com
       TEST_DATABASE_URL: postgresql://postgres:test@localhost:5432/clipper_test
     steps:
       - uses: actions/checkout@v7

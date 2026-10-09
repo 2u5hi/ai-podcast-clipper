@@ -6,14 +6,14 @@ import { revalidatePath } from "next/cache";
 import { env } from "~/env";
 import { inngest } from "~/inngest/client";
 import { canonicalYouTubeUrl, parseYouTubeVideoId } from "~/lib/youtube";
+import { requireVerifiedUserId } from "~/server/accounts";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+import { LIMITS, rateLimit } from "~/server/rate-limit";
 import { v4 as uuidv4 } from "uuid";
 
 export async function processVideo(uploadedFileId: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  const userId = session.user.id;
+  const userId = await requireVerifiedUserId();
 
   // claim the file in one statement: only the owner, and only once
   const claimed = await db.uploadedFile.updateMany({
@@ -40,11 +40,15 @@ export async function processVideo(uploadedFileId: string) {
 
 // same flow as file uploads, but Modal downloads the source itself via youtube_url
 export async function processYouTubeUrl(youtubeUrl: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireVerifiedUserId();
 
   if (!env.YOUTUBE_INGESTION_ENABLED) {
     throw new Error("YouTube links aren't available; upload the video instead");
+  }
+  if (!(await rateLimit(`jobs:user:${userId}`, LIMITS.jobsPerUser))) {
+    throw new Error(
+      "Too many videos in the last hour. Please try again later.",
+    );
   }
 
   const videoId = parseYouTubeVideoId(youtubeUrl);
@@ -58,7 +62,7 @@ export async function processYouTubeUrl(youtubeUrl: string) {
     data: {
       s3Key,
       displayName: canonicalUrl,
-      userId: session.user.id,
+      userId: userId,
       uploaded: true,
     },
   });
@@ -67,7 +71,7 @@ export async function processYouTubeUrl(youtubeUrl: string) {
     name: "process-video-events",
     data: {
       uploadedFileId: uploadedFile.id,
-      userId: session.user.id,
+      userId: userId,
       youtubeUrl: canonicalUrl,
     },
   });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
+  requireVerifiedUserId: vi.fn(),
   send: vi.fn(),
   updateMany: vi.fn(),
   update: vi.fn(),
@@ -9,7 +9,13 @@ const mocks = vi.hoisted(() => ({
   env: { YOUTUBE_INGESTION_ENABLED: false },
 }));
 
-vi.mock("~/server/auth", () => ({ auth: mocks.auth }));
+vi.mock("~/server/accounts", () => ({
+  requireVerifiedUserId: mocks.requireVerifiedUserId,
+}));
+vi.mock("~/server/rate-limit", () => ({
+  LIMITS: { jobsPerUser: { limit: 20, windowSeconds: 3600 } },
+  rateLimit: () => Promise.resolve(true),
+}));
 vi.mock("~/inngest/client", () => ({ inngest: { send: mocks.send } }));
 vi.mock("~/server/db", () => ({
   db: {
@@ -28,12 +34,12 @@ const { processVideo, processYouTubeUrl } = await import("./generation");
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.env.YOUTUBE_INGESTION_ENABLED = false;
-  mocks.auth.mockResolvedValue({ user: { id: "user-a" } });
+  mocks.requireVerifiedUserId.mockResolvedValue("user-a");
 });
 
 describe("processVideo", () => {
-  it("refuses a caller who isn't signed in", async () => {
-    mocks.auth.mockResolvedValue(null);
+  it("refuses a caller who isn't signed in and verified", async () => {
+    mocks.requireVerifiedUserId.mockRejectedValue(new Error("Unauthorized"));
     await expect(processVideo("file-1")).rejects.toThrow("Unauthorized");
     expect(mocks.updateMany).not.toHaveBeenCalled();
     expect(mocks.send).not.toHaveBeenCalled();

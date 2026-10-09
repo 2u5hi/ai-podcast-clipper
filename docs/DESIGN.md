@@ -63,11 +63,13 @@ Prisma schema: `ai-podcast-clipper-frontend/prisma/schema.prisma`; changes ship 
 
 | Model | Purpose | Notes |
 |---|---|---|
-| `User` | Account and credit balance | `email` unique, `password` bcrypt hash, `credits` (default 0, `CHECK >= 0`), `stripeCustomerId` |
+| `User` | Account and credit balance | `email` unique and lowercase (`CHECK`), `emailVerified`, `password` bcrypt hash, `credits` (default 0, `CHECK >= 0`), `stripeCustomerId` |
 | `CreditLedgerEntry` | One row per balance change | signed `delta`, `reason` (`OPENING_BALANCE`, `SIGNUP_GRANT`, `PURCHASE`, `JOB_RESERVE`, `JOB_REFUND`, `ADMIN_ADJUSTMENT`), optional job, unique `stripeEventId`; a balance always equals the sum of its rows ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
 | `UploadedFile` | One processing job | `s3Key` (`<uuid>/original.<ext>` or `youtube_<videoId>/original.mp4`), `uploaded`, `status` string |
 | `Clip` | One produced clip | `s3Key` (`<prefix>/clip_<n>.mp4`), belongs to a user and a file |
-| `Account`, `Session`, `VerificationToken` | Auth.js adapter tables | Unused with JWT sessions and the credentials provider |
+| `VerificationToken` | Email-link tokens | `verify:<userId>` / `reset:<userId>`, SHA-256 of the token, expiry ([ADR 0015](adr/0015-verified-rate-limited-accounts.md)) |
+| `RateLimit` | Fixed-window counters | `(key, windowStart)` → `count` |
+| `Account`, `Session` | Auth.js adapter tables | Unused with JWT sessions and the credentials provider |
 | `Post` | T3 template leftover | Unused; removed in Phase 1 |
 
 ### 4.1 Job states
@@ -126,17 +128,22 @@ scale-down window. Models load once per container in `@modal.enter()`; Torch wei
 ## 7. Accounts and access
 
 Auth.js v5 with the credentials provider and JWT sessions ([ADR 0006](adr/0006-credentials-auth-with-jwt.md)).
-Sign-up (`src/actions/auth.ts`) validates with Zod, hashes with bcrypt, and creates a Stripe customer when Stripe
-is configured. The session callback copies `token.sub` into `session.user.id`; server actions read it through
+Sign-up (`src/actions/auth.ts`) validates and lowercases with Zod, hashes with bcrypt, creates a Stripe customer
+when Stripe is configured, and emails a confirmation link; actions that spend credits or money require a confirmed
+email ([ADR 0015](adr/0015-verified-rate-limited-accounts.md)). The session callback copies `token.sub` into `session.user.id`; server actions read it through
 `auth()`.
 
 | Action | Checks today |
 |---|---|
-| `generateUploadUrl` | Signed in; MP4 only, 1 byte–500MB; the size and type are signed into the PUT URL, so S3 refuses any other body |
-| `processVideo` | Signed in; one `updateMany` claims the file only if the caller owns it and it wasn't already submitted |
-| `processYouTubeUrl` | Signed in; `YOUTUBE_INGESTION_ENABLED`; youtube.com/youtu.be link parsed with a URL parser; canonical URL rebuilt from the id ([ADR 0012](adr/0012-youtube-off-for-customers.md)) |
+| `generateUploadUrl` | Verified email; 20/hour; MP4 only, 1 byte–500MB; the size and type are signed into the PUT URL, so S3 refuses any other body |
+| `processVideo` | Verified email; one `updateMany` claims the file only if the caller owns it and it wasn't already submitted |
+| `processYouTubeUrl` | Verified email; 20/hour; `YOUTUBE_INGESTION_ENABLED`; youtube.com/youtu.be link parsed with a URL parser; canonical URL rebuilt from the id ([ADR 0012](adr/0012-youtube-off-for-customers.md)) |
 | `getClipPlayUrl` | Signed in; clip belongs to the user |
-| `createCheckoutSession` | Signed in |
+| `createCheckoutSession` | Verified email |
+| `signUp` | 10/hour per IP; email lowercased; account starts at 0 credits; sends the confirmation link |
+| `verifyEmail` | Single-use token; grants 10 credits once ([ADR 0015](adr/0015-verified-rate-limited-accounts.md)) |
+| `requestPasswordReset` / `resetPassword` | Same answer for unknown emails; 3/hour per email, 10/hour per IP; single-use one-hour token |
+| Sign-in (`authorize`) | 10/min per email, 30/min per IP; over the limit, the form says so |
 
 ## 8. Payments
 
@@ -178,7 +185,7 @@ and Inngest have their own run logs in their dashboards. Production error tracki
 | Storage isolation | Per-job prefix for everything | Done |
 | Webhook | Signature verified; idempotent on the Stripe event id | Done |
 | Secrets | In `.env` files and Modal secrets; some shared through earlier sessions | Rotated; least-privilege IAM |
-| Abuse | No rate limits; 10 free credits per account | Rate limits; credits on verified email |
+| Abuse | Rate limits on sign-up, sign-in, reset, and jobs; free credits only with a confirmed email | Done |
 | Logs | Server-action argument logging is off in development (`next.config.js`), so passwords never reach Loki | Done |
 
 ## 12. Known limitations

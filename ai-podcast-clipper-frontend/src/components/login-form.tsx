@@ -51,7 +51,9 @@ export function LoginForm({
         redirect: false,
       });
 
-      if (signInResult?.error) {
+      if (signInResult?.code === "rate_limited") {
+        setError("Too many attempts. Please wait a minute and try again.");
+      } else if (signInResult?.error) {
         setError("Invalid email or password.");
       } else {
         router.push("/dashboard");
@@ -91,6 +93,12 @@ export function LoginForm({
               <div className="grid gap-2">
                 <div className="flex items-center">
                   <Label htmlFor="password">Password</Label>
+                  <Link
+                    href="/forgot-password"
+                    className="ml-auto text-sm underline-offset-4 hover:underline"
+                  >
+                    Forgot your password?
+                  </Link>
                 </div>
                 <Input
                   id="password"

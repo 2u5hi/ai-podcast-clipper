@@ -16,6 +16,7 @@ export default async function DashboardPage() {
   const userData = await db.user.findUniqueOrThrow({
     where: { id: session.user.id },
     select: {
+      emailVerified: true,
       uploadedFiles: {
         where: {
           uploaded: true,
@@ -55,6 +56,7 @@ export default async function DashboardPage() {
       uploadedFiles={formattedFiles}
       clips={userData.clips}
       youtubeEnabled={env.YOUTUBE_INGESTION_ENABLED}
+      emailVerified={userData.emailVerified !== null}
     />
   );
 }

@@ -19,3 +19,4 @@ One file per decision: the context, what was decided, where it lives in the code
 | [0012](0012-youtube-off-for-customers.md) | YouTube links are off for customers unless explicitly enabled; only canonical URLs reach the worker | Ingestion |
 | [0013](0013-credit-ledger-reserve-and-settle.md) | Credits move through a ledger; jobs reserve, then settle; the database refuses negatives and duplicate Stripe events | Billing |
 | [0014](0014-prisma-migrations.md) | Schema changes are Prisma migrations from a verified baseline; `db push` is retired | Persistence |
+| [0015](0015-verified-rate-limited-accounts.md) | Accounts are verified before they spend; emails lowercase; rate limits in Postgres; Resend for mail | Auth |

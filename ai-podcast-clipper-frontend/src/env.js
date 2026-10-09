@@ -27,6 +27,15 @@ export const env = createEnv({
     STRIPE_LARGE_CREDIT_PACK: z.string(),
     BASE_URL: z.string(),
     STRIPE_WEBHOOK_SECRET: z.string(),
+    // verification and password-reset email; in development without a key, links are printed to the server log
+    RESEND_API_KEY:
+      process.env.NODE_ENV === "production"
+        ? z.string()
+        : z.string().optional(),
+    EMAIL_FROM:
+      process.env.NODE_ENV === "production"
+        ? z.string()
+        : z.string().optional(),
     // YouTube links are off unless explicitly enabled (ADR 0012)
     YOUTUBE_INGESTION_ENABLED: z
       .enum(["true", "false"])
@@ -67,6 +76,8 @@ export const env = createEnv({
     BASE_URL: process.env.BASE_URL,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     YOUTUBE_INGESTION_ENABLED: process.env.YOUTUBE_INGESTION_ENABLED,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    EMAIL_FROM: process.env.EMAIL_FROM,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

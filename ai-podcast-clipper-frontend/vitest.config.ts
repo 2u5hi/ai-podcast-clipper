@@ -10,5 +10,7 @@ export default defineConfig({
     globalSetup: ["./vitest.db-setup.ts"],
     // the *.db.test.ts files share one database
     fileParallelism: false,
+    // next-auth imports "next/server" without an extension, which Node's ESM loader rejects; let Vite resolve it
+    server: { deps: { inline: ["next-auth"] } },
   },
 });

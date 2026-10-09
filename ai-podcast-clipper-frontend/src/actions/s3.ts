@@ -4,7 +4,8 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "~/env";
 import { checkUpload, UPLOAD_CONTENT_TYPE } from "~/lib/uploads";
-import { auth } from "~/server/auth";
+import { requireVerifiedUserId } from "~/server/accounts";
+import { LIMITS, rateLimit } from "~/server/rate-limit";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "~/server/db";
 
@@ -18,8 +19,12 @@ export async function generateUploadUrl(fileInfo: {
   key: string;
   uploadedFileId: string;
 }> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireVerifiedUserId();
+  if (!(await rateLimit(`jobs:user:${userId}`, LIMITS.jobsPerUser))) {
+    throw new Error(
+      "Too many uploads in the last hour. Please try again later.",
+    );
+  }
 
   const problem = checkUpload(fileInfo);
   if (problem) throw new Error(problem);
@@ -50,7 +55,7 @@ export async function generateUploadUrl(fileInfo: {
 
   const uploadedFileDbRecord = await db.uploadedFile.create({
     data: {
-      userId: session.user.id,
+      userId,
       s3Key: key,
       displayName: fileInfo.filename.slice(0, 200),
       uploaded: false,
