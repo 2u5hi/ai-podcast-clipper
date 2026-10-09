@@ -6,6 +6,6 @@ export const BRAND = {
   productName: "Podcast Clipper",
   supportEmail: "[support@yourdomain.com]",
   governingCountry: "[Country]",
-  // burned into clips made by accounts that haven't bought credits (ADR 0016); today's mark until the company has a name
+  // burned into clips made by accounts that haven't bought credits (ADR 0016); kept as DailyTech by choice for now
   houseWatermark: "DAILYTECH.AI",
 } as const;

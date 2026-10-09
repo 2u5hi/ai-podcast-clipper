@@ -9,10 +9,12 @@ phases get the same treatment when they start. Decisions along the way are in [`
 A self-serve SaaS that turns long-form podcasts and interviews into vertical, captioned, branded short-form
 clips. A creator uploads an episode, buys credits, and downloads clips ready for TikTok, Shorts, and Reels.
 
-The clipper is a product of **Soushi Technologies** (chosen 2026-10-09): the company is the legal operator (terms,
+The clipper is a product of **Soushi Technologies** (chosen 2026-10-09), the parent company; whether products later
+sit in their own subsidiaries is decided when one needs it. Soushi is the legal operator (terms,
 privacy policy, Stripe, invoices) and also does tech solutions and AI integration work, and can run other
 products later. The product gets its own descriptive name, not chosen yet. Both live in
-`src/config/brand.ts`. DailyTech stays the name of the social accounts. "Soushi AI" was ruled out: Soshi
+`src/config/brand.ts`. DailyTech stays the name of the social accounts, and DAILYTECH.AI stays the house watermark on free clips for
+now (decided 2026-10-09). "Soushi AI" was ruled out: Soshi
 (soshi.io) is a funded AI social-media-marketing startup, too close in name and market.
 
 | Pillar | What it means here |
