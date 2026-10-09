@@ -12,17 +12,31 @@ const email = arg("email");
 const password = arg("password") ?? process.env.REVIEWER_PASSWORD;
 const credits = Number(arg("credits") ?? 50);
 if (!email || !password) {
-  console.error("Required: --email <email> --password <password> (or REVIEWER_PASSWORD)");
+  console.error(
+    "Required: --email <email> --password <password> (or REVIEWER_PASSWORD)",
+  );
   process.exit(1);
 }
 
 const prisma = new PrismaClient();
 const hashed = await bcrypt.hash(password, 10);
 
-const user = await prisma.user.upsert({
-  where: { email },
-  update: { password: hashed, credits },
-  create: { email, password: hashed, credits },
+// sets the balance to --credits with one ADMIN_ADJUSTMENT ledger row for the difference (ADR 0013)
+const user = await prisma.$transaction(async (tx) => {
+  const account = await tx.user.upsert({
+    where: { email },
+    update: { password: hashed },
+    create: { email, password: hashed },
+  });
+  const delta = credits - account.credits;
+  if (delta === 0) return account;
+  await tx.creditLedgerEntry.create({
+    data: { userId: account.id, delta, reason: "ADMIN_ADJUSTMENT" },
+  });
+  return tx.user.update({
+    where: { id: account.id },
+    data: { credits: { increment: delta } },
+  });
 });
 console.log(`Reviewer account ready: ${user.email}, credits: ${user.credits}`);
 

@@ -59,11 +59,12 @@ AWS S3 ── list prefix ──► Inngest writes Clip rows, deducts credits
 
 ## 4. Data model
 
-Prisma schema: `ai-podcast-clipper-frontend/prisma/schema.prisma`.
+Prisma schema: `ai-podcast-clipper-frontend/prisma/schema.prisma`; changes ship as migrations in `prisma/migrations/` ([ADR 0014](adr/0014-prisma-migrations.md)).
 
 | Model | Purpose | Notes |
 |---|---|---|
-| `User` | Account and credit balance | `email` unique, `password` bcrypt hash, `credits` default 10, `stripeCustomerId` |
+| `User` | Account and credit balance | `email` unique, `password` bcrypt hash, `credits` (default 0, `CHECK >= 0`), `stripeCustomerId` |
+| `CreditLedgerEntry` | One row per balance change | signed `delta`, `reason` (`OPENING_BALANCE`, `SIGNUP_GRANT`, `PURCHASE`, `JOB_RESERVE`, `JOB_REFUND`, `ADMIN_ADJUSTMENT`), optional job, unique `stripeEventId`; a balance always equals the sum of its rows ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
 | `UploadedFile` | One processing job | `s3Key` (`<uuid>/original.<ext>` or `youtube_<videoId>/original.mp4`), `uploaded`, `status` string |
 | `Clip` | One produced clip | `s3Key` (`<prefix>/clip_<n>.mp4`), belongs to a user and a file |
 | `Account`, `Session`, `VerificationToken` | Auth.js adapter tables | Unused with JWT sessions and the credentials provider |
@@ -77,7 +78,7 @@ Prisma schema: `ai-podcast-clipper-frontend/prisma/schema.prisma`.
 queued ──► processing ──► processed
    │            │
    │            └──► failed        (Modal error, nothing recovered from S3)
-   └──► no credits                 (balance was 0 when the job started)
+   └──► no credits                 (nothing could be reserved when the job started)
 ```
 
 `uploaded` is a separate flag: `false` from the moment the signed PUT is issued until the client confirms the
@@ -103,23 +104,24 @@ scale-down window. Models load once per container in `@modal.enter()`; Torch wei
 | 1. Fetch | Download `original` from S3, or run yt-dlp when `youtube_url` is set and upload the result to S3 |
 | 2. Transcribe | WhisperX large-v2 (float16, batch 16), then word-level alignment for English |
 | 3. Pick moments | Gemini, with a JSON response schema and a fallback chain of models ([ADR 0004](adr/0004-gemini-moment-selection.md)) |
-| 4. Filter | `moments.py`: keep moments of 25–70s; if fewer than 3, top up with the longest moments of 15s or more; at most 5 |
+| 4. Filter | `moments.py`: keep moments of 25–70s; if fewer than 3, top up with the longest moments of 15s or more; at most `max_clips` (1–5, the credits the job reserved) |
 | 5. Per clip | Cut the segment → LR-ASD finds the speaking face per frame → crop to 1080×1920 following the speaker, or fit over a blurred background when no face is tracked → captions (pysubs2, Anton font, 5 words per line) → watermark via ffmpeg `drawtext` ([ADR 0007](adr/0007-burned-in-watermark.md)) |
 | 6. Deliver | Upload `clip_<n>.mp4` beside the original; delete the run's `/tmp` directory |
 
 ## 6. The job function
 
-`processVideo` in `src/inngest/functions.ts`. One retry; concurrency limited to one job per `userId`.
+`runProcessVideo` in `src/inngest/functions.ts`, registered as Inngest's `process-video`. One retry; one job per
+`userId` at a time. Credits are reserved, then settled ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)).
 
 | Step | |
 |---|---|
-| `check-credits` | Read the file's user and balance |
-| `set-status-processing` | Only when the balance is above zero; otherwise `set-status-no-credits` and stop |
-| `step.fetch` to Modal | Bearer `PROCESS_VIDEO_ENDPOINT_AUTH`; non-2xx throws |
-| `create-clips-in-db` | List the job's S3 prefix; create a `Clip` row for each key except `original.mp4` |
-| `deduct-credits` | Decrement by `min(balance, clipsFound)` ([ADR 0005](adr/0005-credits-per-clip.md)) |
+| `reserve-credits` | Take `min(balance, 5)` in one transaction with a `JOB_RESERVE` ledger row; zero → `set-status-no-credits` and stop |
+| `set-status-processing` | |
+| `step.fetch` to Modal | `s3_key`, `max_clips` = the reservation, optional `youtube_url`; bearer `PROCESS_VIDEO_ENDPOINT_AUTH`; non-2xx throws |
+| `create-clips-in-db` | List `<prefix>/` in S3; record clip keys (not `original.mp4`) up to the reservation |
+| `settle-credits` | Refund `reserved − delivered` as `JOB_REFUND` |
 | `set-status-processed` | |
-| On error | `check-for-recovered-clips`: if clips exist in S3, create the missing rows, charge for them, mark `processed`; otherwise mark `failed` and rethrow |
+| On error | `check-for-recovered-clips` records any clips that reached S3 anyway; `settle-failed-job` refunds the rest and marks `processed` or `failed`; with nothing delivered, the error is rethrown |
 
 ## 7. Accounts and access
 
@@ -141,7 +143,9 @@ is configured. The session callback copies `token.sub` into `session.user.id`; s
 Stripe Checkout in `payment` mode, three one-time prices (`STRIPE_SMALL/MEDIUM/LARGE_CREDIT_PACK`) for 50,
 150, and 500 credits. The webhook at `/api/webhooks/stripe` verifies the signature, re-fetches the session
 with its line items, maps the price id to a credit amount, and increments the balance of the user with that
-Stripe customer id. Not idempotent yet (LAUNCH_PLAN F4).
+Stripe customer id. Only `payment_status: "paid"` sessions add credits. The ledger row carries the Stripe event
+id under a unique index and is written before the balance, so a redelivered event changes nothing and gets a 200
+([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)).
 
 ## 9. Configuration
 
@@ -172,7 +176,7 @@ and Inngest have their own run logs in their dashboards. Production error tracki
 | Shell commands in the worker | Argument lists only; `s3_key` and `youtube_url` validated against fixed patterns before use ([`inputs.py`](../ai-podcast-clipper-backend/inputs.py)); bearer token compared in constant time | Done |
 | Server action authorization | Session and ownership on every action | Done |
 | Storage isolation | Per-job prefix for everything | Done |
-| Webhook | Signature verified; not idempotent | Event ids recorded |
+| Webhook | Signature verified; idempotent on the Stripe event id | Done |
 | Secrets | In `.env` files and Modal secrets; some shared through earlier sessions | Rotated; least-privilege IAM |
 | Abuse | No rate limits; 10 free credits per account | Rate limits; credits on verified email |
 | Logs | Server-action argument logging is off in development (`next.config.js`), so passwords never reach Loki | Done |

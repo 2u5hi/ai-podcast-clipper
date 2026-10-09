@@ -1,6 +1,6 @@
 # 0005. A credit is one delivered clip, charged after the job
 
-**Status:** accepted (2026-06), recorded retroactively — **to be revised in Phase 1 commit 4**
+**Status:** accepted (2026-06), recorded retroactively. The charging rules are superseded by [ADR 0013](0013-credit-ledger-reserve-and-settle.md); the unit stands
 
 ## Context
 Users buy credit packs. The question is what a credit buys and when it is taken.

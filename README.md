@@ -88,7 +88,7 @@ and design notes (labels vs. content, ingestion vs. event time).
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill in the values.
-2. **Frontend:** `cd ai-podcast-clipper-frontend && npm install && npm run db:push && npm run dev`
+2. **Frontend:** `cd ai-podcast-clipper-frontend && npm install && npx prisma migrate deploy && npm run dev`
 3. **Backend (Modal):**
    ```bash
    cd ai-podcast-clipper-backend

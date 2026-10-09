@@ -7,5 +7,8 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts"],
+    globalSetup: ["./vitest.db-setup.ts"],
+    // the *.db.test.ts files share one database
+    fileParallelism: false,
   },
 });

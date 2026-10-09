@@ -2,9 +2,12 @@
 
 import { hashPassword } from "~/lib/auth";
 import { signupSchema, type SignupFormValues } from "~/schemas/auth";
+import { grantCredits } from "~/server/credits";
 import { db } from "~/server/db";
 import Stripe from "stripe";
 import { env } from "~/env";
+
+const SIGNUP_CREDITS = 10;
 
 type SignupResult = {
   success: boolean;
@@ -37,7 +40,10 @@ export async function signUp(data: SignupFormValues): Promise<SignupResult> {
     // Try to create Stripe customer, but don't fail signup if Stripe isn't configured
     let stripeCustomerId: string | null = null;
     try {
-      if (env.STRIPE_SECRET_KEY && !env.STRIPE_SECRET_KEY.includes('placeholder')) {
+      if (
+        env.STRIPE_SECRET_KEY &&
+        !env.STRIPE_SECRET_KEY.includes("placeholder")
+      ) {
         const stripe = new Stripe(env.STRIPE_SECRET_KEY);
         const stripeCustomer = await stripe.customers.create({
           email: email.toLowerCase(),
@@ -45,15 +51,26 @@ export async function signUp(data: SignupFormValues): Promise<SignupResult> {
         stripeCustomerId = stripeCustomer.id;
       }
     } catch (stripeError) {
-      console.warn('Stripe customer creation failed, continuing without:', stripeError);
+      console.warn(
+        "Stripe customer creation failed, continuing without:",
+        stripeError,
+      );
     }
 
-    await db.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        stripeCustomerId,
-      },
+    await db.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          stripeCustomerId,
+        },
+        select: { id: true },
+      });
+      await grantCredits(tx, {
+        userId: user.id,
+        amount: SIGNUP_CREDITS,
+        reason: "SIGNUP_GRANT",
+      });
     });
 
     return { success: true };

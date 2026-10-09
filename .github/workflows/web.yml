@@ -22,6 +22,20 @@ jobs:
     defaults:
       run:
         working-directory: ai-podcast-clipper-frontend
+    # The billing tests (*.db.test.ts) run against a real Postgres built from prisma/migrations.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: clipper_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     # Placeholders so src/env.js validates and modules load at build time; nothing here reaches a real service.
     env:
       AUTH_SECRET: ci
@@ -41,6 +55,7 @@ jobs:
       BASE_URL: http://localhost:3000
       INNGEST_EVENT_KEY: ci
       INNGEST_SIGNING_KEY: signkey-test-00
+      TEST_DATABASE_URL: postgresql://postgres:test@localhost:5432/clipper_test
     steps:
       - uses: actions/checkout@v7
 
@@ -56,6 +71,14 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      # The committed migrations must build exactly what schema.prisma describes
+      - name: Migrations match the schema
+        run: >-
+          npx prisma migrate diff --exit-code
+          --from-migrations prisma/migrations
+          --to-schema-datamodel prisma/schema.prisma
+          --shadow-database-url postgresql://postgres:test@localhost:5432/postgres
 
       - name: Test
         run: npm test

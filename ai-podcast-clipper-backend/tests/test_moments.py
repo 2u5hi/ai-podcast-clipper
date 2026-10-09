@@ -46,6 +46,12 @@ class TestSelectMoments:
         moments = [moment(i * 100, 30) for i in range(MAX_CLIPS + 3)]
         assert len(select_moments(moments)) == MAX_CLIPS
 
+    def test_never_exceeds_the_clips_paid_for(self):
+        moments = [moment(i * 100, 30) for i in range(4)]
+        assert select_moments(moments, max_clips=1) == [moment(0, 30)]
+        assert len(select_moments(moments, max_clips=2)) == 2
+        assert select_moments([moment(0, 5), moment(10, 3)], max_clips=1) == [moment(0, 5)]
+
     def test_falls_back_to_raw_moments_when_none_usable(self):
         moments = [moment(0, 5), moment(10, 3)]
         assert select_moments(moments) == moments

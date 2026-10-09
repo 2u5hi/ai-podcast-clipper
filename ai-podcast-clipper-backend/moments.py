@@ -28,8 +28,11 @@ def parse_moments(raw: str) -> list:
     return moments
 
 
-def select_moments(moments: list) -> list:
-    """Keep 30-60s moments (some tolerance); top up with the longest leftovers if under 3."""
+def select_moments(moments: list, max_clips: int = MAX_CLIPS) -> list:
+    """Keep 30-60s moments (some tolerance); top up with the longest leftovers if under 3.
+
+    Never returns more than max_clips: the web app reserves one credit per clip it asks for.
+    """
     valid = [
         m for m in moments
         if isinstance(m, dict) and "start" in m and "end" in m
@@ -45,6 +48,6 @@ def select_moments(moments: list) -> list:
         well_sized += extras[: 3 - len(well_sized)]
         print(f"Topped up to {len(well_sized)} moments with shorter clips")
     if well_sized:
-        return well_sized[:MAX_CLIPS]
+        return well_sized[:max_clips]
     print("Warning: no usable moments returned; using raw moments")
-    return moments[:MAX_CLIPS]
+    return moments[:max_clips]

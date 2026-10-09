@@ -13,7 +13,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import modal
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 import os
 from google import genai
@@ -22,12 +22,14 @@ import pysubs2
 from tqdm import tqdm
 
 from inputs import canonical_youtube_url, is_valid_s3_key
-from moments import parse_moments, select_moments
+from moments import MAX_CLIPS, parse_moments, select_moments
 
 
 class ProcessVideoRequest(BaseModel):
     s3_key: str
     youtube_url: Optional[str] = None
+    # how many credits the web app reserved; one clip per credit
+    max_clips: int = Field(default=MAX_CLIPS, ge=1, le=MAX_CLIPS)
 
 
 image = (modal.Image.from_registry(
@@ -515,7 +517,7 @@ class AiPodcastClipper:
         # 2. Identify moments for clips
         print("Identifying clip moments")
         identified_moments_raw = self.identify_moments(transcript_segments)
-        clip_moments = select_moments(parse_moments(identified_moments_raw))
+        clip_moments = select_moments(parse_moments(identified_moments_raw), request.max_clips)
         print(clip_moments)
 
         # 3. Process clips
