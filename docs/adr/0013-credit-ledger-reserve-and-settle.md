@@ -33,3 +33,4 @@ Every side effect is inside an Inngest step, so a replayed run repeats none of t
 - While a job runs, its reservation is out of the balance, so the dashboard shows fewer credits until it settles.
 - Tested against a real Postgres built from the migrations (`src/server/billing.db.test.ts`, also in CI), including a webhook delivered three times and a failing pipeline; mutating the fixes makes those tests fail.
 - **The unit is still per clip.** The smoke tests put a 75-second source at ~150s of L40S time for 2 clips; per-clip pricing can lose money on long episodes, where transcription grows with length. Choosing the unit and the pack prices is a business decision that needs per-job cost tracking (Phase 2) and is left open in [`PLAN.md`](../PLAN.md).
+- Added 2026-10-10: a full Stripe refund takes the pack's credits back as `PURCHASE_REFUND`, capped at the balance and keyed on the refund event's id (LAUNCH_PLAN F17).

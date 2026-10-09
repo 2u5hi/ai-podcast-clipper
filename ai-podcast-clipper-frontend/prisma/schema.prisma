@@ -75,6 +75,7 @@ enum CreditReason {
   OPENING_BALANCE // balances that existed before the ledger
   SIGNUP_GRANT
   PURCHASE
+  PURCHASE_REFUND // a Stripe refund taking back a pack's credits (never below zero)
   JOB_RESERVE // taken when a job starts
   JOB_REFUND // the part of a reservation a job didn't use
   ADMIN_ADJUSTMENT

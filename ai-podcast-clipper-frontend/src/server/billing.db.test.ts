@@ -7,6 +7,7 @@ if (url) process.env.DATABASE_URL = url;
 const mocks = vi.hoisted(() => ({
   s3Keys: [] as string[],
   checkoutPriceId: "price_small",
+  sessionCustomer: "",
   sessionUserId: null as string | null,
 }));
 
@@ -57,6 +58,17 @@ vi.mock("stripe", () => ({
         retrieve: () =>
           Promise.resolve({
             line_items: { data: [{ price: { id: mocks.checkoutPriceId } }] },
+          }),
+        list: () =>
+          Promise.resolve({
+            data: [
+              {
+                customer: mocks.sessionCustomer,
+                line_items: {
+                  data: [{ price: { id: mocks.checkoutPriceId } }],
+                },
+              },
+            ],
           }),
       },
     };
@@ -323,6 +335,76 @@ describe.skipIf(!url)("billing against Postgres", () => {
         );
         expect(response.status).toBe(200);
       }
+
+      expect(await balance(user.id)).toBe(50);
+    });
+
+    function refund(eventId: string, refunded = true) {
+      return new Request("http://localhost/api/webhooks/stripe", {
+        method: "POST",
+        headers: { "stripe-signature": "t=1,v1=test" },
+        body: JSON.stringify({
+          id: eventId,
+          type: "charge.refunded",
+          data: {
+            object: { id: "ch_test", payment_intent: "pi_test", refunded },
+          },
+        }),
+      });
+    }
+
+    async function buySmallPack(user: { stripeCustomerId: string | null }) {
+      mocks.sessionCustomer = user.stripeCustomerId!;
+      await stripeWebhook(
+        checkout(`evt_${crypto.randomUUID()}`, user.stripeCustomerId!),
+      );
+    }
+
+    it("takes a refunded pack's credits back, once however often the refund is delivered", async () => {
+      const user = await makeUser(0);
+      await buySmallPack(user);
+      expect(await balance(user.id)).toBe(50);
+
+      const eventId = `evt_${crypto.randomUUID()}`;
+      for (let i = 0; i < 3; i++) {
+        expect((await stripeWebhook(refund(eventId))).status).toBe(200);
+      }
+
+      expect(await balance(user.id)).toBe(0);
+      const reasons = await db.creditLedgerEntry.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "asc" },
+        select: { reason: true, delta: true },
+      });
+      expect(reasons).toEqual([
+        { reason: "PURCHASE", delta: 50 },
+        { reason: "PURCHASE_REFUND", delta: -50 },
+      ]);
+    });
+
+    it("never takes back more than is left: spent credits stay spent", async () => {
+      const user = await makeUser(0);
+      await buySmallPack(user);
+      const { file } = await makeFile(user.id);
+      await db.$transaction((tx) =>
+        reserveCredits(tx, {
+          userId: user.id,
+          uploadedFileId: file.id,
+          max: 5,
+        }),
+      );
+      expect(await balance(user.id)).toBe(45);
+
+      await stripeWebhook(refund(`evt_${crypto.randomUUID()}`));
+
+      expect(await balance(user.id)).toBe(0);
+    });
+
+    it("leaves partial refunds to a manual adjustment", async () => {
+      const user = await makeUser(0);
+      await buySmallPack(user);
+
+      await stripeWebhook(refund(`evt_${crypto.randomUUID()}`, false));
 
       expect(await balance(user.id)).toBe(50);
     });

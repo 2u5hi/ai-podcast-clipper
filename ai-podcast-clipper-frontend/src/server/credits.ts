@@ -84,3 +84,35 @@ export async function refundCredits(
     data: { credits: { increment: job.amount } },
   });
 }
+
+// Takes back a refunded pack's credits, but never more than the balance: credits already spent
+// on clips stay spent. Returns how many were removed (possibly 0; the row is still recorded so a
+// redelivered refund event fails on its unique id and removes nothing).
+export async function revokeRefundedCredits(
+  tx: Tx,
+  refund: { userId: string; amount: number; stripeEventId: string },
+): Promise<number> {
+  const user = await tx.user.findUniqueOrThrow({
+    where: { id: refund.userId },
+    select: { credits: true },
+  });
+  const removed = Math.max(0, Math.min(refund.amount, user.credits));
+
+  await tx.creditLedgerEntry.create({
+    data: {
+      userId: refund.userId,
+      delta: -removed,
+      reason: "PURCHASE_REFUND",
+      stripeEventId: refund.stripeEventId,
+    },
+  });
+  if (removed > 0) {
+    // conditional on the balance read above; if a job reserved credits meanwhile, this throws and Stripe retries
+    const taken = await tx.user.updateMany({
+      where: { id: refund.userId, credits: { gte: removed } },
+      data: { credits: { decrement: removed } },
+    });
+    if (taken.count === 0) throw new Error("Balance changed during refund");
+  }
+  return removed;
+}

@@ -66,7 +66,7 @@ Prisma schema: `ai-podcast-clipper-frontend/prisma/schema.prisma`; changes ship 
 | Model | Purpose | Notes |
 |---|---|---|
 | `User` | Account and credit balance | `email` unique and lowercase (`CHECK`), `emailVerified`, `password` bcrypt hash, `credits` (default 0, `CHECK >= 0`), `stripeCustomerId`, `watermarkText` (1–40 printable characters, `CHECK`; null = none) |
-| `CreditLedgerEntry` | One row per balance change | signed `delta`, `reason` (`OPENING_BALANCE`, `SIGNUP_GRANT`, `PURCHASE`, `JOB_RESERVE`, `JOB_REFUND`, `ADMIN_ADJUSTMENT`), optional job, unique `stripeEventId`; a balance always equals the sum of its rows ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
+| `CreditLedgerEntry` | One row per balance change | signed `delta`, `reason` (`OPENING_BALANCE`, `SIGNUP_GRANT`, `PURCHASE`, `PURCHASE_REFUND`, `JOB_RESERVE`, `JOB_REFUND`, `ADMIN_ADJUSTMENT`), optional job, unique `stripeEventId`; a balance always equals the sum of its rows ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
 | `UploadedFile` | One processing job | `s3Key` (`<uuid>/original.<ext>` or `youtube_<videoId>/original.mp4`), `uploaded`, `status` string |
 | `Clip` | One produced clip | `s3Key` (`<prefix>/clip_<n>.mp4`), belongs to a user and a file |
 | `VerificationToken` | Email-link tokens | `verify:<userId>` / `reset:<userId>`, SHA-256 of the token, expiry ([ADR 0015](adr/0015-verified-rate-limited-accounts.md)) |
@@ -162,6 +162,11 @@ with its line items, maps the price id to a credit amount, and increments the ba
 Stripe customer id. Only `payment_status: "paid"` sessions add credits. The ledger row carries the Stripe event
 id under a unique index and is written before the balance, so a redelivered event changes nothing and gets a 200
 ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)).
+
+A full refund (`charge.refunded`) finds the checkout session by payment intent and takes the pack's credits
+back as `PURCHASE_REFUND`, never more than the current balance (spent credits stay spent), once per event.
+Partial refunds are left to a manual `ADMIN_ADJUSTMENT`. The live webhook must subscribe to both events
+([DEPLOY.md](DEPLOY.md) C5).
 
 ## 9. Configuration
 
