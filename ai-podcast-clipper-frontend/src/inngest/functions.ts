@@ -1,5 +1,7 @@
 import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
+import { type JobStatus } from "@prisma/client";
 import { env } from "~/env";
+import { failureReasonFor } from "~/lib/job-failures";
 import { refundCredits, reserveCredits } from "~/server/credits";
 import { db } from "~/server/db";
 import { inngest } from "./client";
@@ -48,13 +50,13 @@ export async function runProcessVideo({
 
     if (job.reserved === 0) {
       await step.run("set-status-no-credits", () =>
-        setStatus(uploadedFileId, "no credits"),
+        setStatus(uploadedFileId, "NO_CREDITS"),
       );
       return;
     }
 
     await step.run("set-status-processing", () =>
-      setStatus(uploadedFileId, "processing"),
+      setStatus(uploadedFileId, "PROCESSING"),
     );
 
     const modalResponse = await step.fetch(env.PROCESS_VIDEO_ENDPOINT, {
@@ -93,14 +95,14 @@ export async function runProcessVideo({
     );
 
     await step.run("set-status-processed", () =>
-      setStatus(uploadedFileId, "processed"),
+      setStatus(uploadedFileId, "PROCESSED"),
     );
   } catch (error: unknown) {
     const reservedJob = job;
     if (!reservedJob) {
       // failed before any credits were taken
       await step.run("set-status-failed", () =>
-        setStatus(uploadedFileId, "failed"),
+        setStatus(uploadedFileId, "FAILED", failureReasonFor(error)),
       );
       throw error;
     }
@@ -119,7 +121,9 @@ export async function runProcessVideo({
           amount: reservedJob.reserved - delivered,
         }),
       );
-      await setStatus(uploadedFileId, delivered > 0 ? "processed" : "failed");
+      await (delivered > 0
+        ? setStatus(uploadedFileId, "PROCESSED")
+        : setStatus(uploadedFileId, "FAILED", failureReasonFor(error)));
     });
 
     if (delivered === 0) throw error;
@@ -139,10 +143,14 @@ export const processVideo = inngest.createFunction(
   runProcessVideo,
 );
 
-async function setStatus(uploadedFileId: string, status: string) {
+async function setStatus(
+  uploadedFileId: string,
+  status: JobStatus,
+  failureReason: string | null = null,
+) {
   await db.uploadedFile.update({
     where: { id: uploadedFileId },
-    data: { status },
+    data: { status, failureReason },
   });
 }
 

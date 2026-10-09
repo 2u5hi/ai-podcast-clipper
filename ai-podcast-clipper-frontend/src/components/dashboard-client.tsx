@@ -1,7 +1,7 @@
 "use client";
 
 import Dropzone, { type DropzoneState } from "shadcn-dropzone";
-import type { Clip } from "@prisma/client";
+import type { Clip, JobStatus } from "@prisma/client";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Loader2, UploadCloud } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { resendVerificationEmail } from "~/actions/auth";
 import { generateUploadUrl } from "~/actions/s3";
 import { toast } from "sonner";
@@ -40,7 +40,8 @@ export function DashboardClient({
     id: string;
     s3Key: string;
     filename: string;
-    status: string;
+    status: JobStatus;
+    failureReason: string | null;
     clipsCount: number;
     createdAt: Date;
   }[];
@@ -55,6 +56,16 @@ export function DashboardClient({
   const [submittingYoutube, setSubmittingYoutube] = useState(false);
   const [resendingVerification, setResendingVerification] = useState(false);
   const router = useRouter();
+
+  // jobs settle on their own; keep the table current while any are still running
+  const hasActiveJobs = uploadedFiles.some(
+    (file) => file.status === "QUEUED" || file.status === "PROCESSING",
+  );
+  useEffect(() => {
+    if (!hasActiveJobs) return;
+    const timer = setInterval(() => router.refresh(), 15_000);
+    return () => clearInterval(timer);
+  }, [hasActiveJobs, router]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -282,7 +293,7 @@ export function DashboardClient({
                           <TableHead>File</TableHead>
                           <TableHead>Uploaded</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Clips created</TableHead>
+                          <TableHead>Result</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -295,33 +306,10 @@ export function DashboardClient({
                               {new Date(item.createdAt).toLocaleDateString()}
                             </TableCell>
                             <TableCell>
-                              {item.status === "queued" && (
-                                <Badge variant="outline">Queued</Badge>
-                              )}
-                              {item.status === "processing" && (
-                                <Badge variant="outline">Processing</Badge>
-                              )}
-                              {item.status === "processed" && (
-                                <Badge variant="outline">Processed</Badge>
-                              )}
-                              {item.status === "no credits" && (
-                                <Badge variant="destructive">No credits</Badge>
-                              )}
-                              {item.status === "failed" && (
-                                <Badge variant="destructive">Failed</Badge>
-                              )}
+                              <JobStatusBadge status={item.status} />
                             </TableCell>
                             <TableCell>
-                              {item.clipsCount > 0 ? (
-                                <span>
-                                  {item.clipsCount} clip
-                                  {item.clipsCount !== 1 ? "s" : ""}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">
-                                  No clips yet
-                                </span>
-                              )}
+                              <JobOutcome job={item} />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -389,4 +377,68 @@ export function DashboardClient({
       </Tabs>
     </div>
   );
+}
+
+const STATUS_LABELS: Record<
+  JobStatus,
+  { label: string; variant: "outline" | "destructive" }
+> = {
+  QUEUED: { label: "Queued", variant: "outline" },
+  PROCESSING: { label: "Processing", variant: "outline" },
+  PROCESSED: { label: "Done", variant: "outline" },
+  FAILED: { label: "Failed", variant: "destructive" },
+  NO_CREDITS: { label: "No credits", variant: "destructive" },
+};
+
+function JobStatusBadge({ status }: { status: JobStatus }) {
+  const { label, variant } = STATUS_LABELS[status];
+  return (
+    <Badge variant={variant}>
+      {status === "PROCESSING" && (
+        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+      )}
+      {label}
+    </Badge>
+  );
+}
+
+// what happened to the job, including the refund when nothing was delivered (ADR 0013)
+function JobOutcome({
+  job,
+}: {
+  job: { status: JobStatus; failureReason: string | null; clipsCount: number };
+}) {
+  if (job.status === "FAILED") {
+    return (
+      <div className="text-sm">
+        <p className="text-red-600">
+          {job.failureReason ?? "Processing failed."}
+        </p>
+        <p className="text-muted-foreground">Credits refunded</p>
+      </div>
+    );
+  }
+  if (job.status === "NO_CREDITS") {
+    return (
+      <span className="text-muted-foreground text-sm">
+        Buy credits, then upload again
+      </span>
+    );
+  }
+  if (job.clipsCount > 0) {
+    return (
+      <span>
+        {job.clipsCount} clip{job.clipsCount !== 1 ? "s" : ""}
+      </span>
+    );
+  }
+  if (job.status === "PROCESSED") {
+    return (
+      <div className="text-sm">
+        <p>No clip-worthy moments found</p>
+        <p className="text-muted-foreground">Credits refunded</p>
+      </div>
+    );
+  }
+  return <span className="text-muted-foreground">No clips yet</span>;
 }

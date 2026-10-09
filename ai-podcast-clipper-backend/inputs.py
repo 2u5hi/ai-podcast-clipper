@@ -12,3 +12,9 @@ def is_valid_s3_key(key: str) -> bool:
 def canonical_youtube_url(url: str) -> str | None:
     """The only YouTube URL shape the worker will hand to yt-dlp; anything else is refused."""
     return url if _WATCH_URL.fullmatch(url) else None
+
+
+def has_video_and_audio(ffprobe_stream_types: str) -> bool:
+    """True when ffprobe listed at least one video and one audio stream (one codec_type per line)."""
+    types = {line.strip() for line in ffprobe_stream_types.splitlines()}
+    return {"video", "audio"} <= types

@@ -1,6 +1,6 @@
 import pytest
 
-from inputs import canonical_youtube_url, is_valid_s3_key
+from inputs import canonical_youtube_url, has_video_and_audio, is_valid_s3_key
 
 
 class TestS3Key:
@@ -43,3 +43,13 @@ class TestCanonicalYouTubeUrl:
     ])
     def test_rejects_anything_else(self, url):
         assert canonical_youtube_url(url) is None
+
+
+class TestHasVideoAndAudio:
+    def test_needs_both(self):
+        assert has_video_and_audio("video\naudio\n")
+        assert has_video_and_audio("audio\nvideo\ndata\n")
+
+    @pytest.mark.parametrize("output", ["", "video\n", "audio\n", "data\n", "garbage"])
+    def test_refuses_anything_less(self, output):
+        assert not has_video_and_audio(output)

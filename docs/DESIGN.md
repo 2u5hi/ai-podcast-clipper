@@ -74,17 +74,23 @@ Prisma schema: `ai-podcast-clipper-frontend/prisma/schema.prisma`; changes ship 
 
 ### 4.1 Job states
 
-`UploadedFile.status` is a free-form string today; Phase 1 makes it an enum with a failure reason.
+`UploadedFile.status` is the `JobStatus` enum; `failureReason` holds the sentence the dashboard shows for a
+failed job.
 
 ```
-queued ──► processing ──► processed
+QUEUED ──► PROCESSING ──► PROCESSED   (clips delivered; or none found, credits refunded)
    │            │
-   │            └──► failed        (Modal error, nothing recovered from S3)
-   └──► no credits                 (nothing could be reserved when the job started)
+   │            └──► FAILED           (credits refunded; failureReason says why)
+   └──► NO_CREDITS                    (nothing could be reserved when the job started)
 ```
+
+Failure reasons come from `failureReasonFor` (`src/lib/job-failures.ts`), keyed on the worker's HTTP status:
+422 (the worker's ffprobe found no video or audio) asks the user to check the file; 401/403 says processing is
+unavailable; anything else asks them to try again. The raw error never reaches the UI; it stays in Inngest's
+run log. The dashboard refreshes every 15 seconds while any job is queued or processing.
 
 `uploaded` is a separate flag: `false` from the moment the signed PUT is issued until the client confirms the
-upload and the event is sent.
+upload and the event is sent. `scripts/cleanup-stale-jobs.mjs` deletes only those abandoned rows, after a day.
 
 ### 4.2 S3 layout
 
@@ -103,7 +109,7 @@ scale-down window. Models load once per container in `@modal.enter()`; Torch wei
 
 | Step | What happens |
 |---|---|
-| 1. Fetch | Download `original` from S3, or run yt-dlp when `youtube_url` is set and upload the result to S3 |
+| 1. Fetch | Download `original` from S3, or run yt-dlp when `youtube_url` is set and upload the result to S3; then `ffprobe` it and answer 422 unless it has a video and an audio stream |
 | 2. Transcribe | WhisperX large-v2 (float16, batch 16), then word-level alignment for English |
 | 3. Pick moments | Gemini, with a JSON response schema and a fallback chain of models ([ADR 0004](adr/0004-gemini-moment-selection.md)) |
 | 4. Filter | `moments.py`: keep moments of 25–70s; if fewer than 3, top up with the longest moments of 15s or more; at most `max_clips` (1–5, the credits the job reserved) |

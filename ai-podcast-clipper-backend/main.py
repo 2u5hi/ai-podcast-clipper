@@ -21,7 +21,7 @@ from google import genai
 import pysubs2
 from tqdm import tqdm
 
-from inputs import canonical_youtube_url, is_valid_s3_key
+from inputs import canonical_youtube_url, has_video_and_audio, is_valid_s3_key
 from moments import MAX_CLIPS, parse_moments, select_moments
 
 
@@ -509,6 +509,15 @@ class AiPodcastClipper:
             s3_client.upload_file(str(video_path), os.environ["S3_BUCKET_NAME"], s3_key)
         else:
             s3_client.download_file(os.environ["S3_BUCKET_NAME"], s3_key, str(video_path))
+
+        # refuse files without readable video and sound before any GPU work; the web app shows a 422 as
+        # "the file couldn't be read"
+        probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type",
+                                "-of", "csv=p=0", str(video_path)], capture_output=True, text=True)
+        if probe.returncode != 0 or not has_video_and_audio(probe.stdout):
+            shutil.rmtree(base_dir, ignore_errors=True)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                detail="Unreadable video: it needs a video and an audio stream")
 
         # 1. Transcription
         transcript_segments_json = self.transcribe_video(base_dir, video_path)

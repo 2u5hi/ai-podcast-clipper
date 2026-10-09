@@ -26,6 +26,7 @@ export default async function DashboardPage() {
           s3Key: true,
           displayName: true,
           status: true,
+          failureReason: true,
           createdAt: true,
           _count: {
             select: {
@@ -47,6 +48,7 @@ export default async function DashboardPage() {
     s3Key: file.s3Key,
     filename: file.displayName ?? "Unkown filename",
     status: file.status,
+    failureReason: file.failureReason,
     clipsCount: file._count.clips,
     createdAt: file.createdAt,
   }));

@@ -73,13 +73,15 @@ model User {
 }
 
 model UploadedFile {
-  id          String   @id @default(cuid())
-  s3Key       String
-  displayName String?
-  uploaded    Boolean  @default(false)
-  status      String   @default("queued") // processing, processed, no credits
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String    @id @default(cuid())
+  s3Key         String
+  displayName   String?
+  uploaded      Boolean   @default(false)
+  status        JobStatus @default(QUEUED)
+  // shown to the user when status is FAILED; the full error stays in Inngest's run log
+  failureReason String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   clips         Clip[]
   creditEntries CreditLedgerEntry[]
@@ -148,4 +150,12 @@ model RateLimit {
 
   @@id([key, windowStart])
   @@index([windowStart])
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  PROCESSED // finished; may have 0 clips when no moments were found (credits refunded)
+  FAILED // credits refunded; failureReason says why
+  NO_CREDITS
 }

@@ -184,7 +184,7 @@ describe.skipIf(!url)("billing against Postgres", () => {
       expect(
         (await db.uploadedFile.findUniqueOrThrow({ where: { id: file.id } }))
           .status,
-      ).toBe("processed");
+      ).toBe("PROCESSED");
     });
 
     it("asks Modal for no more clips than the user can pay for", async () => {
@@ -226,10 +226,12 @@ describe.skipIf(!url)("billing against Postgres", () => {
       ).rejects.toThrow(/Modal backend failed \(500\)/);
 
       expect(await balance(user.id)).toBe(6);
-      expect(
-        (await db.uploadedFile.findUniqueOrThrow({ where: { id: file.id } }))
-          .status,
-      ).toBe("failed");
+      const failed = await db.uploadedFile.findUniqueOrThrow({
+        where: { id: file.id },
+      });
+      expect(failed.status).toBe("FAILED");
+      expect(failed.failureReason).toMatch(/try again/);
+      expect(failed.failureReason).not.toContain("boom");
       const reasons = await db.creditLedgerEntry.findMany({
         where: { uploadedFileId: file.id },
         orderBy: { createdAt: "asc" },
@@ -257,7 +259,7 @@ describe.skipIf(!url)("billing against Postgres", () => {
       expect(
         (await db.uploadedFile.findUniqueOrThrow({ where: { id: file.id } }))
           .status,
-      ).toBe("processed");
+      ).toBe("PROCESSED");
     });
 
     it("doesn't start without credits", async () => {
@@ -271,7 +273,7 @@ describe.skipIf(!url)("billing against Postgres", () => {
       expect(
         (await db.uploadedFile.findUniqueOrThrow({ where: { id: file.id } }))
           .status,
-      ).toBe("no credits");
+      ).toBe("NO_CREDITS");
     });
   });
 
