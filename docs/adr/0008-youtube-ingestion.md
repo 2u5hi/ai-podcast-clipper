@@ -1,6 +1,6 @@
 # 0008. YouTube ingestion: in the worker when it works, by an operator when it doesn't
 
-**Status:** accepted (2026-06) for the demo; **to be decided for customers in Phase 1 commit 3**
+**Status:** accepted (2026-06) for the demo; the in-app path is superseded by [ADR 0012](0012-youtube-off-for-customers.md) (2026-10-09)
 
 ## Context
 The demo needed clips from a YouTube video. yt-dlp running on Modal is frequently blocked by YouTube's bot

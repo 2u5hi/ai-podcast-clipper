@@ -88,7 +88,7 @@ upload and the event is sent.
 ```
 <uuid>/original.<ext>          uploaded episode
 <uuid>/clip_0.mp4 … clip_4.mp4 produced clips
-youtube_<videoId>/original.mp4 YouTube-ingested episode (shared across users — see LAUNCH_PLAN F3)
+youtube_<videoId>/original.mp4 legacy operator ingestion (ingest_youtube.py); in-app YouTube jobs use <uuid>/ like uploads
 ```
 
 ## 5. The pipeline
@@ -130,9 +130,9 @@ is configured. The session callback copies `token.sub` into `session.user.id`; s
 
 | Action | Checks today |
 |---|---|
-| `generateUploadUrl` | Signed in |
-| `processVideo` | **None** (LAUNCH_PLAN F2) |
-| `processYouTubeUrl` | Signed in; URL matches an 11-character video id |
+| `generateUploadUrl` | Signed in; MP4 only, 1 byte–500MB; the size and type are signed into the PUT URL, so S3 refuses any other body |
+| `processVideo` | Signed in; one `updateMany` claims the file only if the caller owns it and it wasn't already submitted |
+| `processYouTubeUrl` | Signed in; `YOUTUBE_INGESTION_ENABLED`; youtube.com/youtu.be link parsed with a URL parser; canonical URL rebuilt from the id ([ADR 0012](adr/0012-youtube-off-for-customers.md)) |
 | `getClipPlayUrl` | Signed in; clip belongs to the user |
 | `createCheckoutSession` | Signed in |
 
@@ -169,12 +169,13 @@ and Inngest have their own run logs in their dashboards. Production error tracki
 
 | Area | Today | Phase 1 |
 |---|---|---|
-| Shell commands in the worker | `shell=True` with interpolated paths and the YouTube URL | Argument lists only |
-| Server action authorization | Missing on `processVideo` | Session and ownership on every action |
-| Storage isolation | Per-job prefix for uploads; shared prefix for YouTube | Per-job prefix for everything |
+| Shell commands in the worker | Argument lists only; `s3_key` and `youtube_url` validated against fixed patterns before use ([`inputs.py`](../ai-podcast-clipper-backend/inputs.py)); bearer token compared in constant time | Done |
+| Server action authorization | Session and ownership on every action | Done |
+| Storage isolation | Per-job prefix for everything | Done |
 | Webhook | Signature verified; not idempotent | Event ids recorded |
 | Secrets | In `.env` files and Modal secrets; some shared through earlier sessions | Rotated; least-privilege IAM |
 | Abuse | No rate limits; 10 free credits per account | Rate limits; credits on verified email |
+| Logs | Server-action argument logging is off in development (`next.config.js`), so passwords never reach Loki | Done |
 
 ## 12. Known limitations
 

@@ -35,18 +35,19 @@ Read from the code on 2026-10-09. Each one is fixed by a commit in §4 unless ma
 
 | # | Finding | Where | Severity | Fixed in |
 |---|---|---|---|---|
-| F1 | YouTube URL is interpolated into a shell command (`shell=True`) — command injection on the GPU worker | `main.py:495` (and 8 other `shell=True` calls) | **Critical** | 3 |
-| F2 | `processVideo` server action has no session check; any caller can start processing for any file id | `generation.ts:11` | High | 3 |
-| F3 | YouTube jobs write to `youtube_<videoId>/`, shared across users; a second user clipping the same video gets the first user's clips listed as theirs | `generation.ts:53`, `functions.ts` prefix listing | High | 3 |
+| F1 | YouTube URL is interpolated into a shell command (`shell=True`) — command injection on the GPU worker | `main.py:495` (and 8 other `shell=True` calls) | **Critical** | 3 ✅ |
+| F2 | `processVideo` server action has no session check; any caller can start processing for any file id | `generation.ts:11` | High | 3 ✅ |
+| F3 | YouTube jobs write to `youtube_<videoId>/`, shared across users; a second user clipping the same video gets the first user's clips listed as theirs | `generation.ts:53`, `functions.ts` prefix listing | High | 3 ✅ |
 | F4 | Stripe webhook isn't idempotent; a retried `checkout.session.completed` adds credits twice | `stripe/route.ts:57` | High | 4 |
 | F5 | A user with 1 credit can receive 5 clips (`Math.min(credits, clipsFound)`); the recovery path decrements without a floor and can go negative | `functions.ts:112`, `functions.ts:172` | Medium | 4 |
 | F6 | Email is case-sensitive at sign-in and sign-up (`findUnique({ where: { email } })`), but lowercased for Stripe | `auth.ts:26`, `config.ts:51` | Medium | 5 |
-| F7 | Uploads accept any content type and size; the extension comes from the client's filename | `s3.ts:30` | Medium | 3 |
+| F7 | Uploads accept any content type and size; the extension comes from the client's filename | `s3.ts:30` | Medium | 3 ✅ |
 | F8 | Clip tiles fail silently: a failed signed URL leaves a black player with only a console error (BUG-1) | `clip-display.tsx:20` | Medium | 6 |
 | F9 | No rate limits on sign-up, sign-in, or job submission; 10 free credits per account | `schema.prisma:63` | Medium | 5 |
 | F10 | Free-tier Supabase pauses after ~3 weeks idle; the app is fully down when it does | infra | High for launch | 8 |
 | F11 | Leftovers: T3 `Post` model, unused `Account`/`Session` tables under JWT sessions, a QA account with a trivial password | `schema.prisma` | Low | 8 |
 | F12 | Modal web endpoints answer any request longer than 150s with a 303 redirect while the job keeps running (seen in the 2026-10-09 smoke test: 303 at 150.8s, clips landed afterwards). Whether Inngest's `step.fetch` follows it is unverified; this is the likely source of the "timed-out but successful" runs that [ADR 0009](adr/0009-recover-runs-from-s3.md) recovers | `functions.ts` `step.fetch` | Medium | Phase 2 |
+| F13 | Next 16 dev logging printed server-action arguments — sign-up and sign-in passwords — and `observability/` ships dev logs to Loki | `next.config.js` | High (dev) | 3 ✅ |
 
 ---
 
@@ -80,7 +81,7 @@ Each is one commit, with tests, docs (an ADR when a decision is made), and a sho
 |---|---|---|---|
 | 1 ✅ | `docs: plan, design, and decision records` | `docs/PLAN.md`, this file, `docs/DESIGN.md`, `docs/adr/` with the decisions already made, README links | A new session can resume from the docs alone |
 | 2 ✅ | `ci: typecheck, lint, and tests on every push` | `web.yml` (ESLint, Vitest, `next build` with placeholder env) and `backend.yml` (ruff, pytest); lint scripts moved off `next lint`, which Next 16 removed; YouTube id parsing extracted to `src/lib/youtube.ts`; moment parsing and selection extracted to `moments.py` so they test without the GPU stack | A pull request shows green checks; a type error turns them red |
-| 3 | `fix(security): no shell, owned jobs, validated uploads` | Every `subprocess.run` takes an argument list; YouTube URLs validated against an allow-list pattern before use; session + ownership check in `processVideo`; per-job storage prefix for YouTube jobs (`<uuid>/original.mp4`); upload content-type allow-list and size cap; ADR on YouTube ingestion (default: off for customers) | A URL containing `; touch /tmp/x` is rejected before reaching the worker; calling `processVideo` with another user's id fails; two users clipping the same video see only their own clips |
+| 3 ✅ | `fix(security): no shell, owned jobs, validated uploads` | Every `subprocess.run` takes an argument list; YouTube URLs validated against an allow-list pattern before use; session + ownership check in `processVideo`; per-job storage prefix for YouTube jobs (`<uuid>/original.mp4`); upload content-type allow-list and size cap; ADR on YouTube ingestion (default: off for customers) | A URL containing `; touch /tmp/x` is rejected before reaching the worker; calling `processVideo` with another user's id fails; two users clipping the same video see only their own clips |
 | 4 | `fix(billing): idempotent credits that match the work` | `StripeEvent` table keyed by event id, written in the same transaction as the credit change; credits checked against the clips a job will produce; decrement clamped at zero; refund on failure; a `CreditLedger` row per change; ADR on what a credit buys | Replaying the same webhook twice adds credits once; a failed job leaves the balance unchanged; every balance equals the sum of its ledger rows |
 | 5 | `feat(auth): verified, rate-limited accounts` | Emails lowercased on write and lookup (plus a one-off migration); email verification and password reset via Resend; rate limits on sign-up, sign-in, and job submission (Upstash); free credits granted on verification, not on sign-up | An unverified account can't start a job; `Qa@Gmail.com` and `qa@gmail.com` are one account; the 11th sign-in attempt in a minute is refused |
 | 6 | `feat(jobs): states and errors users can see` | Status as an enum (`QUEUED`, `PROCESSING`, `PROCESSED`, `FAILED`, `NO_CREDITS`) with a failure reason; clip tiles show an error and a retry; dashboard shows refunded failures | A job forced to fail shows "Failed — credits refunded" and a reason; a clip whose URL 403s shows an error tile, not a black player |

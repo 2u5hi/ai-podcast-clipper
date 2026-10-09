@@ -32,6 +32,7 @@ import { ClipDisplay } from "./clip-display";
 export function DashboardClient({
   uploadedFiles,
   clips,
+  youtubeEnabled,
 }: {
   uploadedFiles: {
     id: string;
@@ -42,6 +43,7 @@ export function DashboardClient({
     createdAt: Date;
   }[];
   clips: Clip[];
+  youtubeEnabled: boolean;
 }) {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -90,6 +92,7 @@ export function DashboardClient({
       const { success, signedUrl, uploadedFileId } = await generateUploadUrl({
         filename: file.name,
         contentType: file.type,
+        size: file.size,
       });
 
       if (!success) throw new Error("Failed to get upload URL");
@@ -143,7 +146,9 @@ export function DashboardClient({
       <Tabs defaultValue="upload">
         <TabsList>
           <TabsTrigger value="upload">Upload</TabsTrigger>
-          <TabsTrigger value="youtube">YouTube URL</TabsTrigger>
+          {youtubeEnabled && (
+            <TabsTrigger value="youtube">YouTube URL</TabsTrigger>
+          )}
           <TabsTrigger value="my-clips">My Clips</TabsTrigger>
         </TabsList>
 
@@ -287,41 +292,43 @@ export function DashboardClient({
           </Card>
         </TabsContent>
 
-        <TabsContent value="youtube">
-          <Card>
-            <CardHeader>
-              <CardTitle>YouTube URL</CardTitle>
-              <CardDescription>
-                Paste a YouTube URL to generate clips from a podcast video
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
-                  disabled={submittingYoutube}
-                  className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-                <Button
-                  onClick={handleYouTubeSubmit}
-                  disabled={!youtubeUrl.trim() || submittingYoutube}
-                >
-                  {submittingYoutube ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Queuing...
-                    </>
-                  ) : (
-                    "Generate Clips"
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {youtubeEnabled && (
+          <TabsContent value="youtube">
+            <Card>
+              <CardHeader>
+                <CardTitle>YouTube URL</CardTitle>
+                <CardDescription>
+                  Paste a YouTube URL to generate clips from a podcast video
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    disabled={submittingYoutube}
+                    className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  <Button
+                    onClick={handleYouTubeSubmit}
+                    disabled={!youtubeUrl.trim() || submittingYoutube}
+                  >
+                    {submittingYoutube ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Queuing...
+                      </>
+                    ) : (
+                      "Generate Clips"
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="my-clips">
           <Card>

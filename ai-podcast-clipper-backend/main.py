@@ -1,4 +1,5 @@
 import glob
+import hmac
 import json
 import pathlib
 import pickle
@@ -20,6 +21,7 @@ from google import genai
 import pysubs2
 from tqdm import tqdm
 
+from inputs import canonical_youtube_url, is_valid_s3_key
 from moments import parse_moments, select_moments
 
 
@@ -49,7 +51,7 @@ image = (modal.Image.from_registry(
     # asd/ includes the model weights (gitignored, see DEPLOYMENT.md) --
     # gdown can't fetch them at runtime since GDrive blocks Modal's IPs
     .add_local_dir("asd", "/asd", copy=True)
-    .add_local_python_source("moments"))
+    .add_local_python_source("inputs", "moments"))
 
 app = modal.App("ai-podcast-clipper", image=image)
 
@@ -158,10 +160,9 @@ def create_vertical_video(tracks, scores, pyframes_path, pyavi_path, audio_path,
     if vout:
         vout.release()
 
-    ffmpeg_command = (f"ffmpeg -y -i {temp_video_path} -i {audio_path} "
-                      f"-c:v h264 -preset fast -crf 23 -c:a aac -b:a 128k "
-                      f"{output_path}")
-    subprocess.run(ffmpeg_command, shell=True, check=True, text=True)
+    subprocess.run(["ffmpeg", "-y", "-i", str(temp_video_path), "-i", str(audio_path),
+                    "-c:v", "h264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-b:a", "128k",
+                    str(output_path)], check=True, text=True)
 
 
 def create_subtitles_with_ffmpeg(transcript_segments: list, clip_start: float, clip_end: float, clip_video_path: str, output_path: str, max_words: int = 5):
@@ -245,10 +246,8 @@ def create_subtitles_with_ffmpeg(transcript_segments: list, clip_start: float, c
 
     subs.save(subtitle_path)
 
-    ffmpeg_cmd = (f"ffmpeg -y -i {clip_video_path} -vf \"ass={subtitle_path}\" "
-                  f"-c:v h264 -preset fast -crf 23 {output_path}")
-
-    subprocess.run(ffmpeg_cmd, shell=True, check=True)
+    subprocess.run(["ffmpeg", "-y", "-i", str(clip_video_path), "-vf", f"ass={subtitle_path}",
+                    "-c:v", "h264", "-preset", "fast", "-crf", "23", str(output_path)], check=True)
 
 
 def process_clip(base_dir: str, original_video_path: str, s3_key: str, start_time: float, end_time: float, clip_index: int, transcript_segments: list):
@@ -273,23 +272,22 @@ def process_clip(base_dir: str, original_video_path: str, s3_key: str, start_tim
     pyavi_path.mkdir(exist_ok=True)
 
     duration = end_time - start_time
-    cut_command = (f"ffmpeg -i {original_video_path} -ss {start_time} -t {duration} "
-                   f"{clip_segment_path}")
-    subprocess.run(cut_command, shell=True, check=True,
-                   capture_output=True, text=True)
+    subprocess.run(["ffmpeg", "-i", str(original_video_path), "-ss", str(start_time),
+                    "-t", str(duration), str(clip_segment_path)],
+                   check=True, capture_output=True, text=True)
 
-    extract_cmd = f"ffmpeg -i {clip_segment_path} -vn -acodec pcm_s16le -ar 16000 -ac 1 {audio_path}"
-    subprocess.run(extract_cmd, shell=True,
+    subprocess.run(["ffmpeg", "-i", str(clip_segment_path), "-vn", "-acodec", "pcm_s16le",
+                    "-ar", "16000", "-ac", "1", str(audio_path)],
                    check=True, capture_output=True)
 
     shutil.copy(clip_segment_path, base_dir / f"{clip_name}.mp4")
 
-    columbia_command = (f"python demoTalkNet.py --videoName {clip_name} "
-                        f"--videoFolder {str(base_dir)} "
-                        f"--pretrainModel pretrain_TalkSet.model")
+    columbia_command = ["python", "demoTalkNet.py", "--videoName", clip_name,
+                        "--videoFolder", str(base_dir),
+                        "--pretrainModel", "pretrain_TalkSet.model"]
 
     columbia_start_time = time.time()
-    result = subprocess.run(columbia_command, cwd="/asd", shell=True,
+    result = subprocess.run(columbia_command, cwd="/asd",
                             capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(
@@ -324,14 +322,14 @@ def process_clip(base_dir: str, original_video_path: str, s3_key: str, start_tim
     # burn the watermark into the file itself, upper right, small enough to not cover captions
     watermark_text = os.environ.get("WATERMARK_TEXT", "yourbrand.ai")
     watermark_output_path = clip_dir / "pyavi" / "video_final.mp4"
-    watermark_cmd = (
-        f"ffmpeg -y -i {subtitle_output_path} "
-        f"-vf \"drawtext=text='{watermark_text}':fontfile=/usr/share/fonts/truetype/custom/Anton-Regular.ttf"
+    watermark_filter = (
+        f"drawtext=text='{watermark_text}':fontfile=/usr/share/fonts/truetype/custom/Anton-Regular.ttf"
         f":fontsize=36:fontcolor=white@0.6:x=w-tw-30:y=30"
-        f":box=1:boxcolor=black@0.3:boxborderw=6\" "
-        f"-c:v h264 -preset fast -crf 23 -c:a copy {watermark_output_path}"
+        f":box=1:boxcolor=black@0.3:boxborderw=6"
     )
-    subprocess.run(watermark_cmd, shell=True, check=True)
+    subprocess.run(["ffmpeg", "-y", "-i", str(subtitle_output_path), "-vf", watermark_filter,
+                    "-c:v", "h264", "-preset", "fast", "-crf", "23", "-c:a", "copy",
+                    str(watermark_output_path)], check=True)
 
     s3_client = boto3.client("s3")
     s3_client.upload_file(
@@ -363,8 +361,8 @@ class AiPodcastClipper:
     def transcribe_video(self, base_dir: str, video_path: str) -> str:
         import whisperx
         audio_path = base_dir / "audio.wav"
-        extract_cmd = f"ffmpeg -i {video_path} -vn -acodec pcm_s16le -ar 16000 -ac 1 {audio_path}"
-        subprocess.run(extract_cmd, shell=True,
+        subprocess.run(["ffmpeg", "-i", str(video_path), "-vn", "-acodec", "pcm_s16le",
+                        "-ar", "16000", "-ac", "1", str(audio_path)],
                        check=True, capture_output=True)
 
         print("Starting transcription with WhisperX...")
@@ -469,9 +467,18 @@ class AiPodcastClipper:
     def process_video(self, request: ProcessVideoRequest, token: HTTPAuthorizationCredentials = Depends(auth_scheme)):
         s3_key = request.s3_key
 
-        if token.credentials != os.environ["AUTH_TOKEN"]:
+        if not hmac.compare_digest(token.credentials, os.environ["AUTH_TOKEN"]):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                 detail="Incorrect bearer token", headers={"WWW-Authenticate": "Bearer"})
+
+        # both values reach S3 keys and yt-dlp, so refuse anything outside the shapes the web app sends
+        if not is_valid_s3_key(s3_key):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid s3_key")
+        youtube_url = None
+        if request.youtube_url:
+            youtube_url = canonical_youtube_url(request.youtube_url)
+            if youtube_url is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid youtube_url")
 
         run_id = str(uuid.uuid4())
         base_dir = pathlib.Path("/tmp") / run_id
@@ -482,20 +489,18 @@ class AiPodcastClipper:
         s3_client = boto3.client("s3")
         # youtube_url -> download here and push to S3, otherwise the file is already in S3
         # (yt-dlp from Modal IPs gets bot-checked a lot; ingest_youtube.py is the reliable path)
-        if request.youtube_url:
-            print(f"Downloading from YouTube: {request.youtube_url}")
-            cookies_path = base_dir / "cookies.txt"
+        if youtube_url:
+            print(f"Downloading from YouTube: {youtube_url}")
+            yt_cmd = ["yt-dlp", "-f", "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                      "--merge-output-format", "mp4", "-o", str(video_path)]
             yt_cookies = os.environ.get("YT_COOKIES", "")
             if yt_cookies:
+                cookies_path = base_dir / "cookies.txt"
                 cookies_path.write_text(yt_cookies)
-                cookies_flag = f"--cookies {str(cookies_path)}"
-            else:
-                cookies_flag = ""
-            yt_cmd = (
-                f"yt-dlp -f 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4]/best' "
-                f"--merge-output-format mp4 {cookies_flag} -o {str(video_path)} {request.youtube_url}"
-            )
-            result = subprocess.run(yt_cmd, shell=True, capture_output=True, text=True)
+                yt_cmd += ["--cookies", str(cookies_path)]
+            # "--" so the URL can never be read as an option
+            yt_cmd += ["--", youtube_url]
+            result = subprocess.run(yt_cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 raise RuntimeError(f"yt-dlp failed: {result.stderr}")
             print(f"YouTube download complete, uploading to S3 as {s3_key}")

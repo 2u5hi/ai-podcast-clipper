@@ -15,6 +15,9 @@ nextEnv.loadEnvConfig(
 await import("./src/env.js");
 
 /** @type {import("next").NextConfig} */
-const config = {};
+const config = {
+  // dev logging prints server action arguments, passwords included, and those logs feed Loki
+  logging: { serverFunctions: false },
+};
 
 export default config;

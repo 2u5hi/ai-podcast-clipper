@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseYouTubeVideoId } from "./youtube";
+import { canonicalYouTubeUrl, parseYouTubeVideoId } from "./youtube";
 
 describe("parseYouTubeVideoId", () => {
   it("reads the id from a watch link", () => {
@@ -29,5 +29,39 @@ describe("parseYouTubeVideoId", () => {
 
   it("returns null for an id that is too short", () => {
     expect(parseYouTubeVideoId("https://youtu.be/abc")).toBeNull();
+  });
+
+  it("refuses other hosts that merely contain v=", () => {
+    expect(
+      parseYouTubeVideoId("https://evil.com/watch?v=YRvf00NooN8"),
+    ).toBeNull();
+    expect(
+      parseYouTubeVideoId("https://youtube.com.evil.com/watch?v=YRvf00NooN8"),
+    ).toBeNull();
+  });
+
+  it("refuses ids with anything appended", () => {
+    expect(
+      parseYouTubeVideoId(
+        "https://www.youtube.com/watch?v=YRvf00NooN8;touch%20/tmp/x",
+      ),
+    ).toBeNull();
+    expect(
+      parseYouTubeVideoId("https://youtu.be/YRvf00NooN8/extra"),
+    ).toBeNull();
+  });
+
+  it("refuses non-web schemes", () => {
+    expect(
+      parseYouTubeVideoId("javascript://www.youtube.com/watch?v=YRvf00NooN8"),
+    ).toBeNull();
+  });
+});
+
+describe("canonicalYouTubeUrl", () => {
+  it("rebuilds the watch URL from the id", () => {
+    expect(canonicalYouTubeUrl("YRvf00NooN8")).toBe(
+      "https://www.youtube.com/watch?v=YRvf00NooN8",
+    );
   });
 });

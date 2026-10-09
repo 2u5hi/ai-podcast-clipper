@@ -5,37 +5,35 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { revalidatePath } from "next/cache";
 import { env } from "~/env";
 import { inngest } from "~/inngest/client";
-import { parseYouTubeVideoId } from "~/lib/youtube";
+import { canonicalYouTubeUrl, parseYouTubeVideoId } from "~/lib/youtube";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+import { v4 as uuidv4 } from "uuid";
 
 export async function processVideo(uploadedFileId: string) {
-  const uploadedVideo = await db.uploadedFile.findUniqueOrThrow({
-    where: {
-      id: uploadedFileId,
-    },
-    select: {
-      uploaded: true,
-      id: true,
-      userId: true,
-    },
-  });
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
 
-  if (uploadedVideo.uploaded) return;
-
-  await inngest.send({
-    name: "process-video-events",
-    data: { uploadedFileId: uploadedVideo.id, userId: uploadedVideo.userId },
+  // claim the file in one statement: only the owner, and only once
+  const claimed = await db.uploadedFile.updateMany({
+    where: { id: uploadedFileId, userId, uploaded: false },
+    data: { uploaded: true },
   });
+  if (claimed.count === 0) return;
 
-  await db.uploadedFile.update({
-    where: {
-      id: uploadedFileId,
-    },
-    data: {
-      uploaded: true,
-    },
-  });
+  try {
+    await inngest.send({
+      name: "process-video-events",
+      data: { uploadedFileId, userId },
+    });
+  } catch (error) {
+    await db.uploadedFile.update({
+      where: { id: uploadedFileId },
+      data: { uploaded: false },
+    });
+    throw error;
+  }
 
   revalidatePath("/dashboard");
 }
@@ -45,15 +43,21 @@ export async function processYouTubeUrl(youtubeUrl: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
+  if (!env.YOUTUBE_INGESTION_ENABLED) {
+    throw new Error("YouTube links aren't available; upload the video instead");
+  }
+
   const videoId = parseYouTubeVideoId(youtubeUrl);
   if (!videoId) throw new Error("Invalid YouTube URL");
+  const canonicalUrl = canonicalYouTubeUrl(videoId);
 
-  const s3Key = `youtube_${videoId}/original.mp4`;
+  // a fresh prefix per job, so two users clipping the same video never share output
+  const s3Key = `${uuidv4()}/original.mp4`;
 
   const uploadedFile = await db.uploadedFile.create({
     data: {
       s3Key,
-      displayName: youtubeUrl,
+      displayName: canonicalUrl,
       userId: session.user.id,
       uploaded: true,
     },
@@ -64,7 +68,7 @@ export async function processYouTubeUrl(youtubeUrl: string) {
     data: {
       uploadedFileId: uploadedFile.id,
       userId: session.user.id,
-      youtubeUrl,
+      youtubeUrl: canonicalUrl,
     },
   });
 

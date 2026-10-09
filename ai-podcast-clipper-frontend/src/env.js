@@ -27,6 +27,11 @@ export const env = createEnv({
     STRIPE_LARGE_CREDIT_PACK: z.string(),
     BASE_URL: z.string(),
     STRIPE_WEBHOOK_SECRET: z.string(),
+    // YouTube links are off unless explicitly enabled (ADR 0012)
+    YOUTUBE_INGESTION_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
   },
 
   /**
@@ -61,6 +66,7 @@ export const env = createEnv({
     STRIPE_LARGE_CREDIT_PACK: process.env.STRIPE_LARGE_CREDIT_PACK,
     BASE_URL: process.env.BASE_URL,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    YOUTUBE_INGESTION_ENABLED: process.env.YOUTUBE_INGESTION_ENABLED,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

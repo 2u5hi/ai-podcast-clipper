@@ -3,6 +3,7 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "~/env";
+import { checkUpload, UPLOAD_CONTENT_TYPE } from "~/lib/uploads";
 import { auth } from "~/server/auth";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "~/server/db";
@@ -10,6 +11,7 @@ import { db } from "~/server/db";
 export async function generateUploadUrl(fileInfo: {
   filename: string;
   contentType: string;
+  size: number;
 }): Promise<{
   success: boolean;
   signedUrl: string;
@@ -17,7 +19,10 @@ export async function generateUploadUrl(fileInfo: {
   uploadedFileId: string;
 }> {
   const session = await auth();
-  if (!session) throw new Error("Unauthorized");
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const problem = checkUpload(fileInfo);
+  if (problem) throw new Error(problem);
 
   const s3Client = new S3Client({
     region: env.AWS_REGION,
@@ -27,24 +32,27 @@ export async function generateUploadUrl(fileInfo: {
     },
   });
 
-  const fileExtension = fileInfo.filename.split(".").pop() ?? "";
+  // the extension is fixed rather than taken from the client's filename
+  const key = `${uuidv4()}/original.mp4`;
 
-  const uniqueId = uuidv4();
-  const key = `${uniqueId}/original.${fileExtension}`;
-
+  // ContentLength is signed, so S3 refuses a body of any other size than the one checked above
   const command = new PutObjectCommand({
     Bucket: env.S3_BUCKET_NAME,
     Key: key,
-    ContentType: fileInfo.contentType,
+    ContentType: UPLOAD_CONTENT_TYPE,
+    ContentLength: fileInfo.size,
   });
 
-  const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 600 });
+  const signedUrl = await getSignedUrl(s3Client, command, {
+    expiresIn: 600,
+    signableHeaders: new Set(["content-length", "content-type"]),
+  });
 
   const uploadedFileDbRecord = await db.uploadedFile.create({
     data: {
       userId: session.user.id,
       s3Key: key,
-      displayName: fileInfo.filename,
+      displayName: fileInfo.filename.slice(0, 200),
       uploaded: false,
     },
     select: {
