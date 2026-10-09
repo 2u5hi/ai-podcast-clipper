@@ -4,26 +4,28 @@ Phase 1 commit 9 in [`LAUNCH_PLAN.md`](LAUNCH_PLAN.md). Everything here is on fr
 ([ADR 0017](adr/0017-launch-on-free-tiers.md)); nothing requires a paid upgrade or a domain. Steps run top to
 bottom, and each says who does it.
 
-**Never paste a secret into chat or a commit.** Put keys straight into the host's environment settings or the
+**Never paste a secret into chat or a commit.** Put keys straight into Netlify's environment settings or the
 Modal secret; the ones Claude needs locally go in the gitignored `.env` files.
 
-`<site>` below means the live address, e.g. `https://divclip.netlify.app`.
+Host: **Netlify's free plan**. `<site>` below means the live address, e.g. `https://divclip.netlify.app`.
+
+**Netlify credits:** the free plan is a hard 300 credits a month; a production deploy costs about 15, so
+roughly 20 a month. When credits run out the site pauses until the month resets. `netlify.toml` skips builds
+when the web app didn't change; batch web changes rather than deploying each one.
 
 ---
 
 ## A. Decide
 
-| # | Who | Step |
-|---|---|---|
-| A1 | You | Pick the host: **Netlify free** (commercial use appears allowed) or **Vercel Hobby** (free, but non-commercial only, so real payments would need Pro at $20/month). See ADR 0017 |
+Done: Netlify's free plan (ADR 0017).
 
 ## B. Free accounts and settings
 
 | # | Who | Step |
 |---|---|---|
-| B1 | You | Host: create a site from the GitHub repo `2u5hi/ai-podcast-clipper`, base directory `ai-podcast-clipper-frontend`; choose the free subdomain (try `divclip`). The first build may fail until C4 is done |
-| B2 | You | Gmail: turn on 2-Step Verification, then create an **app password** (Google Account → Security → App passwords). Put it in the host's env as `SMTP_PASSWORD` (C4), never in chat |
-| B3 | You | Inngest Cloud (free): create the production app and copy the event and signing keys into the host's env (C4). On Vercel, the Inngest integration does this |
+| B1 | You | Netlify → Add new project → Import from GitHub → `2u5hi/ai-podcast-clipper`. Build settings come from `netlify.toml`; leave them. Site name `divclip` if free (gives `divclip.netlify.app`). Let the first build fail; it has no environment yet |
+| B2 | You | Gmail: turn on 2-Step Verification, then create an **app password** (Google Account → Security → App passwords). Put it in Netlify's env as `SMTP_PASSWORD` (C4), never in chat |
+| B3 | You | Inngest Cloud (free): production environment → copy the event key and signing key into Netlify's env (C4). After the first deploy, add the app URL `<site>/api/inngest` (Apps → Sync new app) |
 | B4 | You | GitHub → repo Settings → Secrets and variables → Actions → **Variables** → `APP_URL` = `<site>`, which turns on the daily keep-alive |
 | B5 | You | Stripe → activate live payments **as an individual** (bank account and identity; no company needed). This can take days, so start early |
 | B6 | You (optional) | DMCA designated agent at copyright.gov (about $6); a lawyer's review of the policies |
@@ -34,9 +36,9 @@ Modal secret; the ones Claude needs locally go in the gitignored `.env` files.
 |---|---|---|
 | C1 | Claude, with your OK | AWS: create IAM user `divclip-app` with [`infra/iam-app-policy.json`](../infra/iam-app-policy.json), create its access key, and apply [`infra/s3-cors.json`](../infra/s3-cors.json) once `<site>` is known. Then deactivate the old `dark-phoenix-dev` keys and stop using `loanlens-dev`'s here |
 | C2 | Claude, with your OK | Rotate the Modal secret `ai-podcast-clipper-secret`: new `AUTH_TOKEN`, the `divclip-app` AWS key, `GEMINI_API_KEY`, `S3_BUCKET_NAME`, `AWS_REGION` |
-| C3 | You | Supabase (free) → reset the database password; put the new `DATABASE_URL` in the host's env and both local `.env` files |
-| C4 | You | Host → environment variables (production), listed below |
-| C5 | You | Stripe (live mode, once B5 is approved): three one-time prices — $9.99, $24.99, $69.99 — and a webhook to `<site>/api/webhooks/stripe` for `checkout.session.completed` and `charge.refunded`; copy the price IDs, webhook secret, and keys into the host's env |
+| C3 | You | Supabase (free) → reset the database password; put the new `DATABASE_URL` in Netlify's env and both local `.env` files |
+| C4 | You | Netlify → Site configuration → Environment variables, listed below; scope them to Builds and Functions (the build needs `DATABASE_URL` to migrate) |
+| C5 | You | Stripe (live mode, once B5 is approved): three one-time prices — $9.99, $24.99, $69.99 — and a webhook to `<site>/api/webhooks/stripe` for `checkout.session.completed` and `charge.refunded`; copy the price IDs, webhook secret, and keys into Netlify's env |
 
 **Production environment variables**
 
@@ -62,7 +64,7 @@ Modal secret; the ones Claude needs locally go in the gitignored `.env` files.
 
 | # | Step |
 |---|---|
-| D1 | Apply pending migrations (5, 6) to the live database with `prisma migrate deploy`. On Vercel the `vercel-build` script does it on production deploys; on Netlify, Claude runs it before the first deploy |
+| D1 | Trigger the production deploy (Netlify → Deploys → Trigger deploy). `scripts/build.mjs` applies pending migrations (5, 6) because `CONTEXT=production`, then builds. Then sync Inngest: `curl -X PUT <site>/api/inngest` |
 | D2 | `SMOKE_BASE_URL=<site> SMOKE_EMAIL=… SMOKE_PASSWORD=… npm run smoke` with a dedicated, verified test account |
 | D3 | A sign-up on `<site>` receives the confirmation email from Gmail |
 | D4 | One real job end to end: upload a short video and watch it reserve, process, deliver, and settle |

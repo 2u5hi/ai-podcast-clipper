@@ -1,0 +1,11 @@
+# Netlify (ADR 0017). The Next.js runtime is detected automatically.
+[build]
+  base = "ai-podcast-clipper-frontend"
+  command = "node scripts/build.mjs"
+  publish = ".next"
+  # The free plan has a hard monthly credit cap (each production deploy costs some), and running out
+  # pauses the site, so only build when the web app itself changed. Exit 0 means "skip this build".
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
+
+[build.environment]
+  NODE_VERSION = "22"

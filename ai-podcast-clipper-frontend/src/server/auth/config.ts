@@ -76,6 +76,8 @@ export const authConfig = {
     }),
   ],
   session: { strategy: "jwt" },
+  // Auth.js trusts the forwarded host automatically only on Vercel; Netlify's proxy sets it correctly too (ADR 0017)
+  trustHost: true,
   callbacks: {
     session: ({ session, token }) => ({
       ...session,

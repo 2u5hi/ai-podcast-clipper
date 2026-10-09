@@ -43,7 +43,7 @@ a public API, and posting directly to social platforms (until Phase 4).
 
 | Layer | Service | Notes |
 |---|---|---|
-| Web app + server actions | Netlify free or Vercel Hobby, on the free subdomain (ADR 0017) | The old `dark-pheonix-dev` Vercel project is retired at launch |
+| Web app + server actions | Netlify's free plan, on the netlify.app subdomain (ADR 0017) | The old `dark-pheonix-dev` Vercel project is retired at launch |
 | Job queue | Inngest Cloud | Durable steps, one job per user at a time |
 | GPU pipeline | Modal, L40S | Scales to zero; weights baked into the image |
 | Database | Supabase Postgres, free plan | A daily keep-alive ping stops it pausing (ADR 0017) |
@@ -59,10 +59,9 @@ Each becomes an ADR when it is made.
 |---|---|
 | Company legal form | Soushi Technologies isn't formed yet, and won't be until the product sells (ADR 0017): Stripe is activated as an individual. A Georgia CPA or lawyer can advise on LLC or otherwise when it's time; moving Stripe to a company account later is a migration to plan for |
 | Keep YouTube URL ingestion for paying users? | Downloading from YouTube conflicts with its terms of service, and Modal's IPs get bot-checked. Off by default ([ADR 0012](adr/0012-youtube-off-for-customers.md)); turning it on needs terms that cover it |
-| Web host | Netlify free (commercial use appears allowed) or Vercel Hobby (non-commercial only); see ADR 0017 |
 | What a credit buys, and pack prices | Today a credit is one clip. Per-minute-of-source pricing tracks GPU cost better. Needs real cost-per-job numbers first (Phase 2) ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
 
-Settled: the company name is Soushi Technologies. Free credits at sign-up are granted only once an email is confirmed, with sign-ups rate-limited
+Settled: the company name is Soushi Technologies, and the host is Netlify's free plan (ADR 0017). Free credits at sign-up are granted only once an email is confirmed, with sign-ups rate-limited
 ([ADR 0015](adr/0015-verified-rate-limited-accounts.md)). Custom watermarks are not sold per clip: branding is
 a reason to buy credits, not a surcharge on them. The watermark rule is per account: any purchase lets a creator
 use their own text or none on every job ([ADR 0016](adr/0016-watermark-per-account.md)).

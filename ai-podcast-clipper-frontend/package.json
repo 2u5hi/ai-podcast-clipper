@@ -21,7 +21,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "vercel-build": "node scripts/vercel-build.mjs",
+    "vercel-build": "node scripts/build.mjs",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
