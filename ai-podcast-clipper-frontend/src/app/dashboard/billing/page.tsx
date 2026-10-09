@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND } from "~/config/brand";
 import type { VariantProps } from "class-variance-authority";
 import { ArrowLeftIcon, CheckIcon } from "lucide-react";
 import Link from "next/link";
@@ -127,7 +128,7 @@ export default function BillingPage() {
             Buy Credits
           </h1>
           <p className="text-muted-foreground">
-            Purchase credits to generate more podcast clips. The more credtis
+            Purchase credits to generate more podcast clips. The more credits
             you buy, the better the value.
           </p>
         </div>
@@ -142,12 +143,16 @@ export default function BillingPage() {
       <div className="bg-muted/50 rounded-lg p-6">
         <h3 className="mb-4 text-lg font-semibold">How credits work</h3>
         <ul className="text-muted-foreground list-disc space-y-2 pl-5 text-sm">
-          <li>1 credit = 1 minute of podcast processing</li>
+          <li>1 credit = 1 finished clip; each video makes up to 5 clips</li>
           <li>
-            The program will create around 1 clip per 5 minutes of podcast
+            You only pay for clips you get: if a video fails or has no
+            clip-worthy moments, its credits come back
+          </li>
+          <li>
+            Clips from free credits carry the {BRAND.houseWatermark} watermark;
+            once you buy any pack, use your own text or none, at no extra cost
           </li>
           <li>Credits never expire and can be used anytime</li>
-          <li>Longer podcasts require more credits based on duration</li>
           <li>All packages are one-time purchases (not subscription)</li>
         </ul>
       </div>

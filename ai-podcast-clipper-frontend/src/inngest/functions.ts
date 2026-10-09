@@ -4,6 +4,7 @@ import { env } from "~/env";
 import { failureReasonFor } from "~/lib/job-failures";
 import { refundCredits, reserveCredits } from "~/server/credits";
 import { db } from "~/server/db";
+import { watermarkForJob } from "~/server/watermark";
 import { inngest } from "./client";
 
 // the most clips the pipeline makes from one video; also the most credits a job reserves
@@ -30,7 +31,14 @@ export async function runProcessVideo({
   step: Steps;
 }) {
   const { uploadedFileId, youtubeUrl } = event.data;
-  let job: { userId: string; s3Key: string; reserved: number } | undefined;
+  let job:
+    | {
+        userId: string;
+        s3Key: string;
+        reserved: number;
+        watermarkText: string | null;
+      }
+    | undefined;
 
   try {
     job = await step.run("reserve-credits", async () => {
@@ -45,7 +53,14 @@ export async function runProcessVideo({
           max: MAX_CLIPS_PER_JOB,
         }),
       );
-      return { userId: file.userId, s3Key: file.s3Key, reserved };
+      // decided once, with the reservation, so a replayed run brands its clips the same way
+      const watermarkText = await watermarkForJob(file.userId);
+      return {
+        userId: file.userId,
+        s3Key: file.s3Key,
+        reserved,
+        watermarkText,
+      };
     });
 
     if (job.reserved === 0) {
@@ -64,6 +79,8 @@ export async function runProcessVideo({
       body: JSON.stringify({
         s3_key: job.s3Key,
         max_clips: job.reserved,
+        // null means no watermark (ADR 0016)
+        watermark_text: job.watermarkText,
         ...(youtubeUrl ? { youtube_url: youtubeUrl } : {}),
       }),
       headers: {

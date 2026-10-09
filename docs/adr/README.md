@@ -11,7 +11,7 @@ One file per decision: the context, what was decided, where it lives in the code
 | [0004](0004-gemini-moment-selection.md) | Gemini picks moments, through a schema, a fallback chain, and a salvage parser | AI |
 | [0005](0005-credits-per-clip.md) | A credit is one delivered clip, charged after the job (charging rules superseded by 0013) | Billing |
 | [0006](0006-credentials-auth-with-jwt.md) | Email-and-password accounts with JWT sessions | Auth |
-| [0007](0007-burned-in-watermark.md) | The watermark is burned into the MP4, and its text is configuration | Pipeline |
+| [0007](0007-burned-in-watermark.md) | The watermark is burned into the MP4, and its text is configuration (one global mark superseded by 0016) | Pipeline |
 | [0008](0008-youtube-ingestion.md) | YouTube ingestion: in the worker when it works, by an operator when it doesn't (in-app half superseded by 0012) | Ingestion |
 | [0009](0009-recover-runs-from-s3.md) | A run that errors is checked against S3 before it is called failed | Reliability |
 | [0010](0010-local-observability-stack.md) | Grafana, Loki, and Promtail for local observability | Tooling |
@@ -20,3 +20,4 @@ One file per decision: the context, what was decided, where it lives in the code
 | [0013](0013-credit-ledger-reserve-and-settle.md) | Credits move through a ledger; jobs reserve, then settle; the database refuses negatives and duplicate Stripe events | Billing |
 | [0014](0014-prisma-migrations.md) | Schema changes are Prisma migrations from a verified baseline; `db push` is retired | Persistence |
 | [0015](0015-verified-rate-limited-accounts.md) | Accounts are verified before they spend; emails lowercase; rate limits in Postgres; Resend for mail | Auth |
+| [0016](0016-watermark-per-account.md) | The company's watermark on free clips; paying creators choose their own text or none; text drawn from a file, never parsed | Pipeline |

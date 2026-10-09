@@ -65,6 +65,9 @@ const NavHeader = ({ credits, email }: { credits: number; email: string }) => {
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/billing">Billing</Link>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/settings">Settings</Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => signOut({ redirectTo: "/login" })}

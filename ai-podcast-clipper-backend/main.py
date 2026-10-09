@@ -23,6 +23,7 @@ from tqdm import tqdm
 
 from inputs import canonical_youtube_url, has_video_and_audio, is_valid_s3_key
 from moments import MAX_CLIPS, parse_moments, select_moments
+from watermark import drawtext_filter, is_valid_watermark_text
 
 
 class ProcessVideoRequest(BaseModel):
@@ -30,6 +31,9 @@ class ProcessVideoRequest(BaseModel):
     youtube_url: Optional[str] = None
     # how many credits the web app reserved; one clip per credit
     max_clips: int = Field(default=MAX_CLIPS, ge=1, le=MAX_CLIPS)
+    # the web app always sends this, null for no watermark; callers that leave it out get the
+    # WATERMARK_TEXT secret, as before (ADR 0016)
+    watermark_text: Optional[str] = None
 
 
 image = (modal.Image.from_registry(
@@ -53,7 +57,7 @@ image = (modal.Image.from_registry(
     # asd/ includes the model weights (gitignored, see DEPLOYMENT.md) --
     # gdown can't fetch them at runtime since GDrive blocks Modal's IPs
     .add_local_dir("asd", "/asd", copy=True)
-    .add_local_python_source("inputs", "moments"))
+    .add_local_python_source("inputs", "moments", "watermark"))
 
 app = modal.App("ai-podcast-clipper", image=image)
 
@@ -252,7 +256,7 @@ def create_subtitles_with_ffmpeg(transcript_segments: list, clip_start: float, c
                     "-c:v", "h264", "-preset", "fast", "-crf", "23", str(output_path)], check=True)
 
 
-def process_clip(base_dir: str, original_video_path: str, s3_key: str, start_time: float, end_time: float, clip_index: int, transcript_segments: list):
+def process_clip(base_dir: str, original_video_path: str, s3_key: str, start_time: float, end_time: float, clip_index: int, transcript_segments: list, watermark_text: Optional[str]):
     clip_name = f"clip_{clip_index}"
     s3_key_dir = os.path.dirname(s3_key)
     output_s3_key = f"{s3_key_dir}/{clip_name}.mp4"
@@ -321,21 +325,19 @@ def process_clip(base_dir: str, original_video_path: str, s3_key: str, start_tim
     create_subtitles_with_ffmpeg(transcript_segments, start_time,
                                  end_time, vertical_mp4_path, subtitle_output_path, max_words=5)
 
-    # burn the watermark into the file itself, upper right, small enough to not cover captions
-    watermark_text = os.environ.get("WATERMARK_TEXT", "yourbrand.ai")
-    watermark_output_path = clip_dir / "pyavi" / "video_final.mp4"
-    watermark_filter = (
-        f"drawtext=text='{watermark_text}':fontfile=/usr/share/fonts/truetype/custom/Anton-Regular.ttf"
-        f":fontsize=36:fontcolor=white@0.6:x=w-tw-30:y=30"
-        f":box=1:boxcolor=black@0.3:boxborderw=6"
-    )
-    subprocess.run(["ffmpeg", "-y", "-i", str(subtitle_output_path), "-vf", watermark_filter,
-                    "-c:v", "h264", "-preset", "fast", "-crf", "23", "-c:a", "copy",
-                    str(watermark_output_path)], check=True)
+    # burn the watermark into the file itself (ADR 0016); None means this job's clips get none
+    final_path = subtitle_output_path
+    if watermark_text is not None:
+        textfile = clip_dir / "pyavi" / "watermark.txt"
+        textfile.write_text(watermark_text, encoding="utf-8")
+        final_path = clip_dir / "pyavi" / "video_final.mp4"
+        subprocess.run(["ffmpeg", "-y", "-i", str(subtitle_output_path), "-vf", drawtext_filter(str(textfile)),
+                        "-c:v", "h264", "-preset", "fast", "-crf", "23", "-c:a", "copy",
+                        str(final_path)], check=True)
 
     s3_client = boto3.client("s3")
     s3_client.upload_file(
-        str(watermark_output_path), os.environ["S3_BUCKET_NAME"], output_s3_key)
+        str(final_path), os.environ["S3_BUCKET_NAME"], output_s3_key)
 
 
 @app.cls(gpu="L40S", timeout=3600, retries=0, scaledown_window=20, secrets=[modal.Secret.from_name("ai-podcast-clipper-secret"), modal.Secret.from_name("yt-dlp-cookies")], volumes={mount_path: volume})
@@ -476,6 +478,12 @@ class AiPodcastClipper:
         # both values reach S3 keys and yt-dlp, so refuse anything outside the shapes the web app sends
         if not is_valid_s3_key(s3_key):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid s3_key")
+        if "watermark_text" in request.model_fields_set:
+            watermark_text = request.watermark_text
+            if watermark_text is not None and not is_valid_watermark_text(watermark_text):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid watermark_text")
+        else:
+            watermark_text = os.environ.get("WATERMARK_TEXT", "yourbrand.ai")
         youtube_url = None
         if request.youtube_url:
             youtube_url = canonical_youtube_url(request.youtube_url)
@@ -535,7 +543,7 @@ class AiPodcastClipper:
                 print("Processing clip" + str(index) + " from " +
                       str(moment["start"]) + " to " + str(moment["end"]))
                 process_clip(base_dir, video_path, s3_key,
-                             moment["start"], moment["end"], index, transcript_segments)
+                             moment["start"], moment["end"], index, transcript_segments, watermark_text)
 
         if base_dir.exists():
             print(f"Cleaning up temp dir after {base_dir}")

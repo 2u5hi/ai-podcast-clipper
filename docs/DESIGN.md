@@ -54,6 +54,7 @@ AWS S3 ── list prefix ──► Inngest writes Clip rows, deducts credits
 | Job function | `src/inngest/functions.ts` | Inngest v4 |
 | GPU pipeline | `ai-podcast-clipper-backend/main.py`, `moments.py` | Modal, Python 3.11, CUDA 12.4, WhisperX large-v2, LR-ASD, ffmpeg, pysubs2, google-genai |
 | Admin ingestion | `ai-podcast-clipper-backend/ingest_youtube.py`, `scripts/trigger-processing.mjs` | yt-dlp locally → S3 → Inngest event |
+| Brand config | `ai-podcast-clipper-frontend/src/config/brand.ts` | Company and product names, support email, governing country (placeholders until chosen), house watermark |
 | Ops scripts | `ai-podcast-clipper-frontend/scripts/` | `ensure-reviewer`, `job-status`, `cleanup-stale-jobs`, `delete-job`, `trigger-processing` |
 | Local observability | `observability/` | Grafana + Loki + Promtail, development only ([ADR 0010](adr/0010-local-observability-stack.md)) |
 
@@ -63,7 +64,7 @@ Prisma schema: `ai-podcast-clipper-frontend/prisma/schema.prisma`; changes ship 
 
 | Model | Purpose | Notes |
 |---|---|---|
-| `User` | Account and credit balance | `email` unique and lowercase (`CHECK`), `emailVerified`, `password` bcrypt hash, `credits` (default 0, `CHECK >= 0`), `stripeCustomerId` |
+| `User` | Account and credit balance | `email` unique and lowercase (`CHECK`), `emailVerified`, `password` bcrypt hash, `credits` (default 0, `CHECK >= 0`), `stripeCustomerId`, `watermarkText` (1–40 printable characters, `CHECK`; null = none) |
 | `CreditLedgerEntry` | One row per balance change | signed `delta`, `reason` (`OPENING_BALANCE`, `SIGNUP_GRANT`, `PURCHASE`, `JOB_RESERVE`, `JOB_REFUND`, `ADMIN_ADJUSTMENT`), optional job, unique `stripeEventId`; a balance always equals the sum of its rows ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
 | `UploadedFile` | One processing job | `s3Key` (`<uuid>/original.<ext>` or `youtube_<videoId>/original.mp4`), `uploaded`, `status` string |
 | `Clip` | One produced clip | `s3Key` (`<prefix>/clip_<n>.mp4`), belongs to a user and a file |
@@ -113,7 +114,7 @@ scale-down window. Models load once per container in `@modal.enter()`; Torch wei
 | 2. Transcribe | WhisperX large-v2 (float16, batch 16), then word-level alignment for English |
 | 3. Pick moments | Gemini, with a JSON response schema and a fallback chain of models ([ADR 0004](adr/0004-gemini-moment-selection.md)) |
 | 4. Filter | `moments.py`: keep moments of 25–70s; if fewer than 3, top up with the longest moments of 15s or more; at most `max_clips` (1–5, the credits the job reserved) |
-| 5. Per clip | Cut the segment → LR-ASD finds the speaking face per frame → crop to 1080×1920 following the speaker, or fit over a blurred background when no face is tracked → captions (pysubs2, Anton font, 5 words per line) → watermark via ffmpeg `drawtext` ([ADR 0007](adr/0007-burned-in-watermark.md)) |
+| 5. Per clip | Cut the segment → LR-ASD finds the speaking face per frame → crop to 1080×1920 following the speaker, or fit over a blurred background when no face is tracked → captions (pysubs2, Anton font, 5 words per line) → the job's watermark, if any, via ffmpeg `drawtext` reading a text file with expansion off ([ADR 0016](adr/0016-watermark-per-account.md)) |
 | 6. Deliver | Upload `clip_<n>.mp4` beside the original; delete the run's `/tmp` directory |
 
 ## 6. The job function
@@ -125,7 +126,7 @@ scale-down window. Models load once per container in `@modal.enter()`; Torch wei
 |---|---|
 | `reserve-credits` | Take `min(balance, 5)` in one transaction with a `JOB_RESERVE` ledger row; zero → `set-status-no-credits` and stop |
 | `set-status-processing` | |
-| `step.fetch` to Modal | `s3_key`, `max_clips` = the reservation, optional `youtube_url`; bearer `PROCESS_VIDEO_ENDPOINT_AUTH`; non-2xx throws |
+| `step.fetch` to Modal | `s3_key`, `max_clips` = the reservation, `watermark_text` (decided in `reserve-credits`: the house mark until the account has bought credits, then its own text or null), optional `youtube_url`; bearer `PROCESS_VIDEO_ENDPOINT_AUTH`; non-2xx throws |
 | `create-clips-in-db` | List `<prefix>/` in S3; record clip keys (not `original.mp4`) up to the reservation |
 | `settle-credits` | Refund `reserved − delivered` as `JOB_REFUND` |
 | `set-status-processed` | |
@@ -146,6 +147,7 @@ email ([ADR 0015](adr/0015-verified-rate-limited-accounts.md)). The session call
 | `processYouTubeUrl` | Verified email; 20/hour; `YOUTUBE_INGESTION_ENABLED`; youtube.com/youtu.be link parsed with a URL parser; canonical URL rebuilt from the id ([ADR 0012](adr/0012-youtube-off-for-customers.md)) |
 | `getClipPlayUrl` | Signed in; clip belongs to the user |
 | `createCheckoutSession` | Verified email |
+| `updateWatermark` | Verified email; account has bought credits; 1–40 printable characters or empty for none |
 | `signUp` | 10/hour per IP; email lowercased; account starts at 0 credits; sends the confirmation link |
 | `verifyEmail` | Single-use token; grants 10 credits once ([ADR 0015](adr/0015-verified-rate-limited-accounts.md)) |
 | `requestPasswordReset` / `resetPassword` | Same answer for unknown emails; 3/hour per email, 10/hour per IP; single-use one-hour token |
@@ -164,7 +166,7 @@ id under a unique index and is written before the balance, so a redelivered even
 
 Frontend variables are validated at startup by `src/env.js` (`@t3-oss/env-nextjs`); the template is
 `.env.example`. The Modal worker reads the secret `ai-podcast-clipper-secret` (`AUTH_TOKEN`, `GEMINI_API_KEY`,
-`S3_BUCKET_NAME`, AWS keys, `WATERMARK_TEXT`) and the optional `yt-dlp-cookies` secret (`YT_COOKIES`).
+`S3_BUCKET_NAME`, AWS keys, `WATERMARK_TEXT` — now only the fallback for callers that don't send `watermark_text`) and the optional `yt-dlp-cookies` secret (`YT_COOKIES`).
 
 | Variable | Used by |
 |---|---|

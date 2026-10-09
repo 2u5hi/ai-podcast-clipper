@@ -1,6 +1,6 @@
 # 0007. The watermark is burned into the MP4, and its text is configuration
 
-**Status:** accepted (2026-06), recorded retroactively
+**Status:** accepted (2026-06), recorded retroactively. The single global watermark is superseded by [ADR 0016](0016-watermark-per-account.md); burning it into the file stands
 
 ## Context
 Clips leave the app: they are downloaded and posted elsewhere. A watermark drawn by the web player would

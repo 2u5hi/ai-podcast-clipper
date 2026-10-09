@@ -53,10 +53,10 @@ Each becomes an ADR when it is made.
 | Decision | Why it's open |
 |---|---|
 | Company name, product name, support email, governing country | Needed by the legal pages (Phase 1 commit 8); placeholders until then. Whether to form a company before taking payments is a question for a local accountant or lawyer; without one, the terms name the founder as the operator |
-| Watermark rule: per account or per credit | Proposed for commit 7: an account that has bought credits gets its own watermark (or none) on every job; until then, the company's. The alternative — tracking free and paid credits separately and branding each job by which it spent — is fairer to free credits held after a purchase but needs two balances. Confirm before commit 7 |
 | Keep YouTube URL ingestion for paying users? | Downloading from YouTube conflicts with its terms of service, and Modal's IPs get bot-checked. Off by default ([ADR 0012](adr/0012-youtube-off-for-customers.md)); turning it on needs terms that cover it |
 | What a credit buys, and pack prices | Today a credit is one clip. Per-minute-of-source pricing tracks GPU cost better. Needs real cost-per-job numbers first (Phase 2) ([ADR 0013](adr/0013-credit-ledger-reserve-and-settle.md)) |
 
 Settled: free credits at sign-up are granted only once an email is confirmed, with sign-ups rate-limited
 ([ADR 0015](adr/0015-verified-rate-limited-accounts.md)). Custom watermarks are not sold per clip: branding is
-a reason to buy credits, not a surcharge on them.
+a reason to buy credits, not a surcharge on them. The watermark rule is per account: any purchase lets a creator
+use their own text or none on every job ([ADR 0016](adr/0016-watermark-per-account.md)).

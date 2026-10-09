@@ -7,6 +7,7 @@ if (url) process.env.DATABASE_URL = url;
 const mocks = vi.hoisted(() => ({
   s3Keys: [] as string[],
   checkoutPriceId: "price_small",
+  sessionUserId: null as string | null,
 }));
 
 vi.mock("~/env", () => ({
@@ -25,6 +26,14 @@ vi.mock("~/env", () => ({
     STRIPE_LARGE_CREDIT_PACK: "price_large",
   },
 }));
+
+vi.mock("~/server/auth", () => ({
+  auth: () =>
+    Promise.resolve(
+      mocks.sessionUserId ? { user: { id: mocks.sessionUserId } } : null,
+    ),
+}));
+vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
@@ -58,6 +67,8 @@ const { db } = await import("~/server/db");
 const { grantCredits, reserveCredits } = await import("~/server/credits");
 const { runProcessVideo } = await import("~/inngest/functions");
 const { POST: stripeWebhook } = await import("~/app/api/webhooks/stripe/route");
+const { updateWatermark } = await import("~/actions/watermark");
+const { BRAND } = await import("~/config/brand");
 
 async function makeUser(credits: number) {
   return db.$transaction(async (tx) => {
@@ -65,6 +76,7 @@ async function makeUser(credits: number) {
       data: {
         email: `user-${crypto.randomUUID()}@example.com`,
         password: "x",
+        emailVerified: new Date(),
         stripeCustomerId: `cus_${crypto.randomUUID()}`,
       },
     });
@@ -101,6 +113,11 @@ function steps(modal: () => Response) {
     fetch,
     step: { run: <T>(_id: string, fn: () => Promise<T>) => fn(), fetch },
   };
+}
+
+function sentBody(fetch: ReturnType<typeof steps>["fetch"]) {
+  const init = fetch.mock.calls[0]?.[1];
+  return JSON.parse(init?.body as string) as Record<string, unknown>;
 }
 
 function sentMaxClips(fetch: ReturnType<typeof steps>["fetch"]) {
@@ -320,6 +337,74 @@ describe.skipIf(!url)("billing against Postgres", () => {
 
       expect(response.status).toBe(200);
       expect(await balance(user.id)).toBe(0);
+    });
+  });
+  describe("watermarks (ADR 0016)", () => {
+    async function purchase(userId: string) {
+      await db.$transaction((tx) =>
+        grantCredits(tx, {
+          userId,
+          amount: 50,
+          reason: "PURCHASE",
+          stripeEventId: `evt_${crypto.randomUUID()}`,
+        }),
+      );
+    }
+
+    async function runJob(userId: string) {
+      const { file } = await makeFile(userId);
+      const { step, fetch } = steps(() => new Response("null"));
+      await runProcessVideo({ event: event(file.id, userId), step });
+      return sentBody(fetch);
+    }
+
+    it("puts the house watermark on jobs from accounts that haven't bought credits", async () => {
+      const user = await makeUser(10);
+      expect((await runJob(user.id)).watermark_text).toBe(BRAND.houseWatermark);
+    });
+
+    it("puts no watermark on a paying account's jobs until they choose one", async () => {
+      const user = await makeUser(0);
+      await purchase(user.id);
+      expect((await runJob(user.id)).watermark_text).toBeNull();
+    });
+
+    it("uses the paying creator's own text", async () => {
+      const user = await makeUser(0);
+      await purchase(user.id);
+      mocks.sessionUserId = user.id;
+
+      expect(await updateWatermark("  @my.podcast ")).toEqual({
+        success: true,
+      });
+      expect((await runJob(user.id)).watermark_text).toBe("@my.podcast");
+
+      expect(await updateWatermark("")).toEqual({ success: true });
+      expect((await runJob(user.id)).watermark_text).toBeNull();
+    });
+
+    it("refuses a custom watermark before any purchase, and invalid text after", async () => {
+      const user = await makeUser(10);
+      mocks.sessionUserId = user.id;
+      expect((await updateWatermark("@mine")).success).toBe(false);
+
+      await purchase(user.id);
+      expect((await updateWatermark("x".repeat(41))).success).toBe(false);
+      expect((await updateWatermark("🎙️ pod")).success).toBe(false);
+      const stored = await db.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(stored.watermarkText).toBeNull();
+    });
+
+    it("can't store an over-long watermark even by going around the app", async () => {
+      const user = await makeUser(0);
+      await expect(
+        db.user.update({
+          where: { id: user.id },
+          data: { watermarkText: "x".repeat(41) },
+        }),
+      ).rejects.toThrow();
     });
   });
 });

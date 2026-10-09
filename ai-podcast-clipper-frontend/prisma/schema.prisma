@@ -62,6 +62,8 @@ model User {
   password         String
   credits          Int       @default(0)
   stripeCustomerId String?   @unique
+  // the creator's own watermark once they've bought credits; null means none (ADR 0016)
+  watermarkText    String?
   image            String?
   accounts         Account[]
   sessions         Session[]
