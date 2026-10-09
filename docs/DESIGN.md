@@ -52,7 +52,7 @@ AWS S3 ── list prefix ──► Inngest writes Clip rows, deducts credits
 |---|---|---|
 | Web app | `ai-podcast-clipper-frontend/` | Next.js 16 (App Router), React 19, TypeScript, Tailwind, shadcn/ui, Auth.js v5, Prisma 6 |
 | Job function | `src/inngest/functions.ts` | Inngest v4 |
-| GPU pipeline | `ai-podcast-clipper-backend/main.py` | Modal, Python 3.11, CUDA 12.4, WhisperX large-v2, LR-ASD, ffmpeg, pysubs2, google-genai |
+| GPU pipeline | `ai-podcast-clipper-backend/main.py`, `moments.py` | Modal, Python 3.11, CUDA 12.4, WhisperX large-v2, LR-ASD, ffmpeg, pysubs2, google-genai |
 | Admin ingestion | `ai-podcast-clipper-backend/ingest_youtube.py`, `scripts/trigger-processing.mjs` | yt-dlp locally → S3 → Inngest event |
 | Ops scripts | `ai-podcast-clipper-frontend/scripts/` | `ensure-reviewer`, `job-status`, `cleanup-stale-jobs`, `delete-job`, `trigger-processing` |
 | Local observability | `observability/` | Grafana + Loki + Promtail, development only ([ADR 0010](adr/0010-local-observability-stack.md)) |
@@ -103,7 +103,7 @@ scale-down window. Models load once per container in `@modal.enter()`; Torch wei
 | 1. Fetch | Download `original` from S3, or run yt-dlp when `youtube_url` is set and upload the result to S3 |
 | 2. Transcribe | WhisperX large-v2 (float16, batch 16), then word-level alignment for English |
 | 3. Pick moments | Gemini, with a JSON response schema and a fallback chain of models ([ADR 0004](adr/0004-gemini-moment-selection.md)) |
-| 4. Filter | Keep moments of 25–70s; if fewer than 3, top up with the longest moments of 15s or more; at most 5 |
+| 4. Filter | `moments.py`: keep moments of 25–70s; if fewer than 3, top up with the longest moments of 15s or more; at most 5 |
 | 5. Per clip | Cut the segment → LR-ASD finds the speaking face per frame → crop to 1080×1920 following the speaker, or fit over a blurred background when no face is tracked → captions (pysubs2, Anton font, 5 words per line) → watermark via ffmpeg `drawtext` ([ADR 0007](adr/0007-burned-in-watermark.md)) |
 | 6. Deliver | Upload `clip_<n>.mp4` beside the original; delete the run's `/tmp` directory |
 

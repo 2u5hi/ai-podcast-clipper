@@ -20,6 +20,8 @@ from google import genai
 import pysubs2
 from tqdm import tqdm
 
+from moments import parse_moments, select_moments
+
 
 class ProcessVideoRequest(BaseModel):
     s3_key: str
@@ -46,7 +48,8 @@ image = (modal.Image.from_registry(
     ])
     # asd/ includes the model weights (gitignored, see DEPLOYMENT.md) --
     # gdown can't fetch them at runtime since GDrive blocks Modal's IPs
-    .add_local_dir("asd", "/asd", copy=True))
+    .add_local_dir("asd", "/asd", copy=True)
+    .add_local_python_source("moments"))
 
 app = modal.App("ai-podcast-clipper", image=image)
 
@@ -507,52 +510,11 @@ class AiPodcastClipper:
         # 2. Identify moments for clips
         print("Identifying clip moments")
         identified_moments_raw = self.identify_moments(transcript_segments)
-
-        cleaned_json_string = identified_moments_raw.strip()
-        if cleaned_json_string.startswith("```json"):
-            cleaned_json_string = cleaned_json_string[len("```json"):].strip()
-        if cleaned_json_string.endswith("```"):
-            cleaned_json_string = cleaned_json_string[:-len("```")].strip()
-
-        try:
-            clip_moments = json.loads(cleaned_json_string)
-        except json.JSONDecodeError:
-            # model response got truncated, salvage whatever complete objects are in there
-            import re
-            clip_moments = [
-                json.loads(m)
-                for m in re.findall(r"\{[^{}]*\}", cleaned_json_string)
-                if '"start"' in m and '"end"' in m
-            ]
-            print(f"Salvaged {len(clip_moments)} moments from malformed JSON")
-        if not clip_moments or not isinstance(clip_moments, list):
-            print("Error: Identified moments is not a list")
-            clip_moments = []
-
-        # keep 30-60s moments (some tolerance); top up with the longest leftovers if under 3
-        valid = [
-            m for m in clip_moments
-            if isinstance(m, dict) and "start" in m and "end" in m
-            and m["end"] > m["start"]
-        ]
-        well_sized = [m for m in valid if 25 <= (m["end"] - m["start"]) <= 70]
-        if len(well_sized) < 3:
-            extras = sorted(
-                (m for m in valid if m not in well_sized and (m["end"] - m["start"]) >= 15),
-                key=lambda m: m["end"] - m["start"],
-                reverse=True,
-            )
-            well_sized += extras[: 3 - len(well_sized)]
-            print(f"Topped up to {len(well_sized)} moments with shorter clips")
-        if well_sized:
-            clip_moments = well_sized
-        else:
-            print("Warning: no usable moments returned; using raw moments")
-
+        clip_moments = select_moments(parse_moments(identified_moments_raw))
         print(clip_moments)
 
         # 3. Process clips
-        for index, moment in enumerate(clip_moments[:5]):
+        for index, moment in enumerate(clip_moments):
             if "start" in moment and "end" in moment:
                 print("Processing clip" + str(index) + " from " +
                       str(moment["start"]) + " to " + str(moment["end"]))

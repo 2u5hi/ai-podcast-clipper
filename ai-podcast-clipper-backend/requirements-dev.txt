@@ -1,0 +1,3 @@
+# Tests and lint only; the pipeline's own dependencies are in requirements.txt and never needed here.
+pytest==8.4.2
+ruff==0.14.0

@@ -5,6 +5,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { revalidatePath } from "next/cache";
 import { env } from "~/env";
 import { inngest } from "~/inngest/client";
+import { parseYouTubeVideoId } from "~/lib/youtube";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 
@@ -44,11 +45,8 @@ export async function processYouTubeUrl(youtubeUrl: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const videoIdMatch = youtubeUrl.match(
-    /(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
-  );
-  if (!videoIdMatch?.[1]) throw new Error("Invalid YouTube URL");
-  const videoId = videoIdMatch[1];
+  const videoId = parseYouTubeVideoId(youtubeUrl);
+  if (!videoId) throw new Error("Invalid YouTube URL");
 
   const s3Key = `youtube_${videoId}/original.mp4`;
 

@@ -1,0 +1,43 @@
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ai-podcast-clipper-backend/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "ai-podcast-clipper-backend/**"
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ai-podcast-clipper-backend
+    steps:
+      - uses: actions/checkout@v7
+
+      # Matches the Modal image's Python
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ai-podcast-clipper-backend/requirements-dev.txt
+
+      # Only test and lint tools: the tests cover pure modules, so no GPU stack, Modal, or keys are needed.
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest -q

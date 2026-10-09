@@ -21,7 +21,7 @@ Done and on `main` (Phase 0, the working demo):
 | Billing | Stripe Checkout for three credit packs (50 / 150 / 500), webhook adds credits; **test mode** |
 | Ops | Scripts for account seeding, manual triggering, job status, stale-job cleanup; local Grafana + Loki + Promtail |
 | Docs | README, this plan, [`DESIGN.md`](DESIGN.md), [ADRs](adr/README.md) |
-| Tests | None. Typecheck passes (`npx tsc --noEmit`) |
+| Tests | Vitest (`npm test`) for the frontend, pytest for the backend's pure modules; both run in GitHub Actions with lint and, for the web app, a production build |
 
 **Health check, 2026-10-09:** typecheck clean; Modal endpoint up (about 100s cold start); S3 and Gemini keys
 valid, and every model in the fallback chain still exists; Supabase had auto-paused again and was restored.
@@ -78,7 +78,7 @@ Each is one commit, with tests, docs (an ADR when a decision is made), and a sho
 | # | Commit | Contents | Done when |
 |---|---|---|---|
 | 1 ✅ | `docs: plan, design, and decision records` | `docs/PLAN.md`, this file, `docs/DESIGN.md`, `docs/adr/` with the decisions already made, README links | A new session can resume from the docs alone |
-| 2 | `ci: typecheck, lint, and tests on every push` | GitHub Actions for the frontend (`tsc`, `eslint`, Vitest) and backend (`ruff`, pytest on pure functions); Vitest and pytest scaffolding with one real test each | A pull request shows green checks; a type error turns them red |
+| 2 ✅ | `ci: typecheck, lint, and tests on every push` | `web.yml` (ESLint, Vitest, `next build` with placeholder env) and `backend.yml` (ruff, pytest); lint scripts moved off `next lint`, which Next 16 removed; YouTube id parsing extracted to `src/lib/youtube.ts`; moment parsing and selection extracted to `moments.py` so they test without the GPU stack | A pull request shows green checks; a type error turns them red |
 | 3 | `fix(security): no shell, owned jobs, validated uploads` | Every `subprocess.run` takes an argument list; YouTube URLs validated against an allow-list pattern before use; session + ownership check in `processVideo`; per-job storage prefix for YouTube jobs (`<uuid>/original.mp4`); upload content-type allow-list and size cap; ADR on YouTube ingestion (default: off for customers) | A URL containing `; touch /tmp/x` is rejected before reaching the worker; calling `processVideo` with another user's id fails; two users clipping the same video see only their own clips |
 | 4 | `fix(billing): idempotent credits that match the work` | `StripeEvent` table keyed by event id, written in the same transaction as the credit change; credits checked against the clips a job will produce; decrement clamped at zero; refund on failure; a `CreditLedger` row per change; ADR on what a credit buys | Replaying the same webhook twice adds credits once; a failed job leaves the balance unchanged; every balance equals the sum of its ledger rows |
 | 5 | `feat(auth): verified, rate-limited accounts` | Emails lowercased on write and lookup (plus a one-off migration); email verification and password reset via Resend; rate limits on sign-up, sign-in, and job submission (Upstash); free credits granted on verification, not on sign-up | An unverified account can't start a job; `Qa@Gmail.com` and `qa@gmail.com` are one account; the 11th sign-in attempt in a minute is refused |
@@ -131,4 +131,6 @@ Say: *"Continue the podcast clipper — read docs/LAUNCH_PLAN.md."* Then:
 - On Windows, stop `next dev` before `prisma generate` (the query engine DLL is locked while it runs).
 - The Modal CLI needs `PYTHONUTF8=1` on Windows.
 - Modal cold start is about 100 seconds; a timeout on the first call after idle isn't an outage.
+- Tests: `npm test` and `npm run lint` in the frontend; `pip install -r requirements-dev.txt`, then `pytest -q` and `ruff check .` in the backend. The backend tests import only pure modules, so the GPU dependencies aren't needed.
+- The frontend's `.npmrc` sets `legacy-peer-deps=true`, so peer dependencies (e.g. `vite` for Vitest) must be installed explicitly.
 - The watermark text comes from `WATERMARK_TEXT` in the Modal secret `ai-podcast-clipper-secret`; the code default is `yourbrand.ai`.

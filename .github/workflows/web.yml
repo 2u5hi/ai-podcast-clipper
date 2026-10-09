@@ -1,0 +1,64 @@
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ai-podcast-clipper-frontend/**"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "ai-podcast-clipper-frontend/**"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ai-podcast-clipper-frontend
+    # Placeholders so src/env.js validates and modules load at build time; nothing here reaches a real service.
+    env:
+      AUTH_SECRET: ci
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      AWS_ACCESS_KEY_ID: ci
+      AWS_SECRET_ACCESS_KEY: ci
+      AWS_REGION: us-east-2
+      S3_BUCKET_NAME: ci
+      PROCESS_VIDEO_ENDPOINT: http://localhost
+      PROCESS_VIDEO_ENDPOINT_AUTH: ci
+      STRIPE_SECRET_KEY: sk_test_ci
+      STRIPE_SMALL_CREDIT_PACK: price_ci
+      STRIPE_MEDIUM_CREDIT_PACK: price_ci
+      STRIPE_LARGE_CREDIT_PACK: price_ci
+      STRIPE_WEBHOOK_SECRET: whsec_ci
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci
+      BASE_URL: http://localhost:3000
+      INNGEST_EVENT_KEY: ci
+      INNGEST_SIGNING_KEY: signkey-test-00
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ai-podcast-clipper-frontend/package-lock.json
+
+      # postinstall runs prisma generate
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Typecheck and build
+        run: npm run build
